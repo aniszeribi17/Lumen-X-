@@ -1,0 +1,13 @@
+# Render blueprint for Lumen X — https://render.com/docs/blueprint-spec
+# Manual setup works too: build command `npm install && npm run build`,
+# start command `npm start`, and set GEMINI_API_KEY in the Environment tab.
+services:
+  - type: web
+    name: lumen-x
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # set the real value in the Render dashboard, never here
