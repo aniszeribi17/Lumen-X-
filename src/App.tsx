@@ -80,6 +80,7 @@ function Home() {
     try {
       const result = await analyzeInput({ prompt: trimmedPrompt, imageData, language });
       if (requestId !== requestIdRef.current) return; // a reset or newer request won
+      setAnalysisPrompt(trimmedPrompt);
       setAnalysis(result);
       setView('result');
       setErrorMessage('');
@@ -138,6 +139,12 @@ function Home() {
     setPrompt('');
     removeImage();
     setAnalysis(null);
+    setAnalysisPrompt('');
+    chatRequestIdRef.current += 1;
+    setChatMessages([]);
+    setChatInput('');
+    setChatError('');
+    setIsChatting(false);
     setView('empty');
     setErrorMessage('');
     setCopied(false);
