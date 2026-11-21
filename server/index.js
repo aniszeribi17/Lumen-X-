@@ -168,7 +168,17 @@ ${prompt}`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: {
-            parts: [{ text: buildSystemPrompt(LANGUAGE_LABELS[language]) }],
+                        parts: [
+              {
+                text:
+                  mode === 'scam'
+                    ? buildScamSystemPrompt(LANGUAGE_LABELS[language])
+                    : mode === 'conversation'
+                      ? buildConversationSystemPrompt(LANGUAGE_LABELS[language])
+                      : buildSystemPrompt(LANGUAGE_LABELS[language]),
+              },
+            ],
+            
           },
           contents: [{ role: 'user', parts }],
           generationConfig: {
