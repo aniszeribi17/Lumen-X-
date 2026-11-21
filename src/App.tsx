@@ -179,6 +179,8 @@ function Home() {
                   <option value="ar">العربية</option>
 <option value="tr">Türkçe</option>
 <option value="de">Deutsch</option>
+<option value="pt">Português</option>
+
 
                 </select>
               </label>
