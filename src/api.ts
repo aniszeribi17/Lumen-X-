@@ -2,6 +2,7 @@
 // These shapes mirror the original Lumen X API exactly — do not rename fields.
 
 export type LumenLanguage = 'ar' | 'en' | 'tr' | 'de' | 'pt';
+export type LumenMode = 'read' | 'scam' | 'conversation';
 
 
 
@@ -13,7 +14,8 @@ export interface LumenAnalysisInput {
   /** Language the analysis should be written in. */
   language: LumenLanguage;
   mode: LumenMode;
-  
+}
+
 
 export interface LumenAnalysis {
   /** The short version: one clear read of the situation. */
@@ -24,6 +26,9 @@ export interface LumenAnalysis {
   nextStep: string;
   /** Words the user can copy and send. */
   reply: string;
+    replyOptions: { tone: string; text: string }[];
+  risk?: { level: 'low' | 'medium' | 'high'; signals: string[] };
+  
   /** Short label for the reply's tone, e.g. "Calm and direct". */
   replyTone: string;
 }
