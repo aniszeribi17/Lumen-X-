@@ -30,6 +30,29 @@ import { prepareImageForAnalysis } from './image';
 // Lumen X — one page: paste something unclear, get a clear read.
 // The whole screen lives in this file, in four small pieces at the bottom:
 // EmptyState, LoadingState, ErrorState, AnalysisResult.
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionEventLike {
+  results?: { [index: number]: { [index: number]: { transcript?: string } } };
+}
+
+interface SavedRead {
+  id: number;
+  prompt: string;
+  analysis: LumenAnalysis;
+  language: LumenLanguage;
+  mode: LumenMode;
+  at: string;
+}
+
 
 export default function App() {
   // The app has a single page. Anything else is a simple "not found".
@@ -49,6 +72,19 @@ function Home() {
   const [copied, setCopied] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isImageProcessing, setIsImageProcessing] = useState(false);
+    const [mode, setMode] = useState<LumenMode>('read');
+  const [isListening, setIsListening] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [history, setHistory] = useState<SavedRead[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('lumen-x-history');
+      const parsed = raw ? (JSON.parse(raw) as SavedRead[]) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [analysisPrompt, setAnalysisPrompt] = useState('');
   const [chatMessages, setChatMessages] = useState<LumenChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -83,10 +119,21 @@ function Home() {
     setIsAnalyzing(true);
     const requestId = ++requestIdRef.current;
     try {
-      const result = await analyzeInput({ prompt: trimmedPrompt, imageData, language });
+            const result = await analyzeInput({ prompt: trimmedPrompt, imageData, language, mode });
       if (requestId !== requestIdRef.current) return; // a reset or newer request won
       setAnalysisPrompt(trimmedPrompt);
       setAnalysis(result);
+            setHistory((previous) => {
+        const next = [
+          { id: Date.now(), prompt: trimmedPrompt, analysis: result, language, mode, at: new Date().toISOString() },
+          ...previous,
+        ].slice(0, 20);
+        try {
+          window.localStorage.setItem('lumen-x-history', JSON.stringify(next));
+        } catch {
+        }
+        return next;
+      });
       setView('result');
       setErrorMessage('');
     } catch (error) {
@@ -137,6 +184,114 @@ function Home() {
       setCopied(false);
     }
   };
+    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const speechRecognitionAvailable =
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const RecognitionCtor =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    if (!RecognitionCtor) return;
+    const recognition = new RecognitionCtor();
+    recognitionRef.current = recognition;
+    const langByLanguage: Record<LumenLanguage, string> = {
+      ar: 'ar-DZ',
+      en: 'en-US',
+      tr: 'tr-TR',
+      de: 'de-DE',
+      pt: 'pt-PT',
+    };
+    recognition.lang = langByLanguage[language];
+    recognition.interimResults = false;
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setPrompt((previous) => (previous.trim() ? `${previous.trim()} ${transcript}` : transcript));
+      }
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    setIsListening(true);
+    recognition.start();
+  };
+
+  const rewriteReply = async (toneInstruction: string) => {
+    if (!analysis || isRewriting) return;
+    setIsRewriting(true);
+    try {
+      const reply = await chatFollowUp({
+        prompt: analysisPrompt,
+        analysis,
+        messages: [
+          {
+            role: 'user',
+            text: `Rewrite the suggested reply in this tone: ${toneInstruction}. Return only the rewritten reply text, nothing else.`,
+          },
+        ],
+        language: analysisLanguage,
+      });
+      setAnalysis({ ...analysis, reply });
+    } catch {
+    } finally {
+      setIsRewriting(false);
+    }
+  };
+
+  const shareAnalysis = async () => {
+    if (!analysis) return;
+    const text = `${analysis.summary}\n\n${analysis.reply}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Lumen X', text });
+        return;
+      } catch {
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1800);
+    } catch {
+      setShareCopied(false);
+    }
+  };
+
+  const restoreRead = (entry: SavedRead) => {
+    chatRequestIdRef.current += 1;
+    setChatMessages([]);
+    setChatInput('');
+    setChatError('');
+    setIsChatting(false);
+    setAnalysisPrompt(entry.prompt);
+    setAnalysis(entry.analysis);
+    setAnalysisLanguage(entry.language);
+    setLanguage(entry.language);
+    setMode(entry.mode);
+    setView('result');
+    setErrorMessage('');
+  };
+
+  const deleteRead = (id: number) => {
+    setHistory((previous) => {
+      const next = previous.filter((entry) => entry.id !== id);
+      try {
+        window.localStorage.setItem('lumen-x-history', JSON.stringify(next));
+      } catch {
+      }
+      return next;
+    });
+  };
+
+      
   const sendChat = async () => {
     const text = chatInput.trim();
     if (!text || !analysis || isChatting) return;
