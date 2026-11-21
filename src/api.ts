@@ -12,7 +12,8 @@ export interface LumenAnalysisInput {
   imageData: string | null;
   /** Language the analysis should be written in. */
   language: LumenLanguage;
-}
+  mode: LumenMode;
+  
 
 export interface LumenAnalysis {
   /** The short version: one clear read of the situation. */
