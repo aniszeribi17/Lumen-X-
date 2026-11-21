@@ -71,7 +71,8 @@ Return ONLY valid JSON with this exact shape:
   "whatItMeans": ["2 to 4 short bullets explaining the important meaning in plain language"],
   "nextStep": "the single most useful thing the user should do next",
   "reply": "a natural, appropriate message the user could send if a reply makes sense; if not, say why in a gentle sentence",
-  "replyTone": "a short label such as Warm and clear, Professional, or Brief and direct"
+ "replyOptions": [{"tone": "Safe and polite", "text": "one alternative reply in that tone"}, {"tone": "Direct", "text": "one alternative reply in that tone"}, {"tone": "Warm", "text": "one alternative reply in that tone"}]
+,"replyTone": "a short label such as Warm and clear, Professional, or Brief and direct"
 }
 
 The entire response's user-facing values — including summary, every whatItMeans bullet, nextStep, reply, and replyTone — MUST be written strictly in ${languageLabel}. Do not mix languages or translate only some fields. Keep the JSON property names exactly as shown above.
