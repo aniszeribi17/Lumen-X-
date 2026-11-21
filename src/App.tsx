@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Clipboard,
   Eye,
+    History,
   ImagePlus,
   Languages,
   Lightbulb,
