@@ -106,7 +106,8 @@ app.post('/api/lumen/analyze', async (req, res) => {
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
   const imageData =
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
-  const language = body.language === 'ar' ? 'ar' : body.language === 'en' || body.language === undefined ? 'en' : null;
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language) ? body.language : body.language === undefined ? 'en' : null;
+
 
 
   if (language === null || prompt.length > 12000 || (!prompt && !imageData)) {
