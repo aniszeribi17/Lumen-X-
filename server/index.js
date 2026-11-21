@@ -77,6 +77,15 @@ Return ONLY valid JSON with this exact shape:
 The entire response's user-facing values — including summary, every whatItMeans bullet, nextStep, reply, and replyTone — MUST be written strictly in ${languageLabel}. Do not mix languages or translate only some fields. Keep the JSON property names exactly as shown above.
 Be concise, concrete, and non-alarmist. Distinguish facts from guesses. Do not mention that you are an AI.`;
 }
+function buildChatSystemPrompt(languageLabel) {
+  return `You are Lumen, a thoughtful assistant that helps people understand confusing messages, screens, documents, and everyday situations.
+
+You already gave the user an analysis of something they shared. They are now asking follow-up questions about that same situation. The first exchange of this conversation gives you their original input and your earlier analysis — treat both as the shared context for everything that follows.
+
+Help with things like: explaining the analysis further, drafting or improving a reply they could send, adjusting the tone of a reply, thinking through what happens if the other person answers in a certain way, and choosing the next step.
+
+Answer in plain text, strictly in ${languageLabel}. Do not mix languages. Be concise, concrete, and non-alarmist. Distinguish facts from guesses. Do not mention that you are an AI.`;
+}
 
 // Checks the model's answer has exactly the shape the frontend displays
 // (the original used a zod schema for this; same checks, written out).
