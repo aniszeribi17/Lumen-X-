@@ -208,6 +208,8 @@ function Home() {
               <span>
                 <span className="block font-display text-[1.18rem] font-semibold leading-none tracking-[-0.045em] text-foreground">lumen <span className="text-primary">x</span></span>
                 <span className="mt-1 block font-mono-label text-[8px] uppercase tracking-[.21em] text-muted-foreground">private cognitive lens</span>
+                            <span>By Anis Zeribi</span>
+                
               </span>
             </button>
             <div className="flex items-center gap-2 sm:gap-3">
