@@ -177,6 +177,9 @@ function Home() {
                 <select value={language} onChange={(event) => setLanguage(event.target.value as LumenLanguage)} aria-label="Language" data-testid="select-language" className="cursor-pointer appearance-none bg-transparent text-[11px] font-semibold text-foreground outline-none">
                   <option value="en">English</option>
                   <option value="ar">العربية</option>
+<option value="tr">Türkçe</option>
+<option value="de">Deutsch</option>
+
                 </select>
               </label>
             </div>
