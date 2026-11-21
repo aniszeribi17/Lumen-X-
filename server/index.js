@@ -217,6 +217,9 @@ ${prompt}`
       nextStep: result.nextStep,
       reply: result.reply,
       replyTone: result.replyTone,
+
+          replyOptions: validReplyOptions(result.replyOptions),
+      ...(mode === 'scam' && isValidRisk(result.risk) ? { risk: result.risk } : {}),
     });
   } catch (error) {
     console.error('Lumen analysis failed:', error);
