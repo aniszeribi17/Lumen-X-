@@ -44,6 +44,12 @@ function Home() {
   const [copied, setCopied] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isImageProcessing, setIsImageProcessing] = useState(false);
+  const [analysisPrompt, setAnalysisPrompt] = useState('');
+  const [chatMessages, setChatMessages] = useState<LumenChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatError, setChatError] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+  const chatRequestIdRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Counts requests so a slow, older answer can never overwrite a newer one.
   const requestIdRef = useRef(0);
@@ -62,6 +68,11 @@ function Home() {
     }
     if (isImageProcessing || isAnalyzing) return;
     setCopied(false);
+    chatRequestIdRef.current += 1;
+    setChatMessages([]);
+    setChatInput('');
+    setChatError('');
+    setIsChatting(false);
     setAnalysisLanguage(language);
     setView('empty');
     setIsAnalyzing(true);
