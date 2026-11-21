@@ -132,7 +132,32 @@ function Home() {
       setCopied(false);
     }
   };
-
+  const sendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || !analysis || isChatting) return;
+    const nextMessages: LumenChatMessage[] = [...chatMessages, { role: 'user', text }];
+    setChatMessages(nextMessages);
+    setChatInput('');
+    setChatError('');
+    setIsChatting(true);
+    const chatRequestId = ++chatRequestIdRef.current;
+    try {
+      const reply = await chatFollowUp({
+        prompt: analysisPrompt,
+        analysis,
+        messages: nextMessages,
+        language: analysisLanguage,
+      });
+      if (chatRequestId !== chatRequestIdRef.current) return;
+      setChatMessages([...nextMessages, { role: 'assistant', text: reply }]);
+    } catch (error) {
+      if (chatRequestId !== chatRequestIdRef.current) return;
+      setChatError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+    } finally {
+      if (chatRequestId === chatRequestIdRef.current) setIsChatting(false);
+    }
+  };
+                                              
   const resetWorkspace = () => {
     requestIdRef.current += 1; // ignore any answer still on its way
     setIsAnalyzing(false);
@@ -302,7 +327,21 @@ function Home() {
             <div className="appear appear-delay-3 lg:col-start-2">
               {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
-              {!isAnalyzing && view === 'result' && analysis && <AnalysisResult analysis={analysis} language={analysisLanguage} copied={copied} onCopy={copyReply} />}
+                            {!isAnalyzing && view === 'result' && analysis && (
+                <div className="space-y-3">
+                  <AnalysisResult analysis={analysis} language={analysisLanguage} copied={copied} onCopy={copyReply} />
+                  <FollowUpChat
+                    messages={chatMessages}
+                    input={chatInput}
+                    onInputChange={setChatInput}
+                    onSend={() => void sendChat()}
+                    isSending={isChatting}
+                    error={chatError}
+                    language={analysisLanguage}
+                  />
+                </div>
+              )}
+      
               {!isAnalyzing && view === 'empty' && !analysis && <EmptyState />}
             </div>
           </section>
@@ -450,6 +489,83 @@ function AnalysisResult({
         </button>
       </article>
     </div>
+  );
+}
+function FollowUpChat({
+  messages,
+  input,
+  onInputChange,
+  onSend,
+  isSending,
+  error,
+  language,
+}: {
+  messages: LumenChatMessage[];
+  input: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+  isSending: boolean;
+  error: string;
+  language: LumenLanguage;
+}) {
+  const handleChatSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSend();
+  };
+
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
+      <div className="flex items-center gap-2 text-accent">
+        <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Keep asking</h2>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">Ask a follow-up about this read — Lumen remembers the message and the analysis.</p>
+
+      {messages.length > 0 && (
+        <div className="mt-5 space-y-2.5" data-testid="list-chat-messages">
+          {messages.map((message, index) => (
+            <div
+              key={`${message.role}-${index}`}
+              className={
+                message.role === 'user'
+                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
+                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
+              }
+            >
+              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
+                {message.role === 'user' ? 'You' : 'Lumen'}
+              </span>
+              <span className="whitespace-pre-wrap">{message.text}</span>
+            </div>
+          ))}
+          {isSending && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              Lumen is thinking...
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-chat-error">{error}</p>
+      )}
+
+      <form onSubmit={handleChatSubmit} className="mt-5 flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(event) => onInputChange(event.target.value)}
+          data-testid="input-chat-message"
+          placeholder="Ask a follow-up..."
+          maxLength={4000}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+        />
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-chat" aria-label="Send follow-up question" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+          <Send className="h-4 w-4" strokeWidth={1.9} />
+        </button>
+      </form>
+    </article>
   );
 }
 
