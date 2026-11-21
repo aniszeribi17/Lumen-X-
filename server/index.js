@@ -211,6 +211,123 @@ ${prompt}`
     return res.status(502).json({ error: "Lumen couldn't finish that read. Please try again." });
   }
 });
+app.post('/api/lumen/chat', async (req, res) => {
+  const body = req.body ?? {};
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+  const messages = rawMessages
+    .filter(
+      (message) =>
+        message !== null &&
+        typeof message === 'object' &&
+        (message.role === 'user' || message.role === 'assistant') &&
+        typeof message.text === 'string' &&
+        message.text.trim().length > 0,
+    )
+    .map((message) => ({ role: message.role, text: message.text.trim() }));
+  const totalChars = messages.reduce((sum, message) => sum + message.text.length, 0);
+
+  if (
+    language === null ||
+    !isValidAnalysis(body.analysis) ||
+    prompt.length > 12000 ||
+    messages.length === 0 ||
+    messages.length > 40 ||
+    messages[messages.length - 1].role !== 'user' ||
+    messages.some((message) => message.text.length > 4000) ||
+    totalChars > 30000
+  ) {
+    return res.status(400).json({ error: 'Please ask a follow-up question about the analysis.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  const contents = [
+    {
+      role: 'user',
+      parts: [
+        {
+          text: `Here is the original input I asked you to read:
+${prompt || '(I shared an image without additional text.)'}
+
+Your earlier analysis of it was:
+${JSON.stringify(body.analysis)}`,
+        },
+      ],
+    },
+    {
+      role: 'model',
+      parts: [{ text: 'Understood — I have the original input and my earlier analysis. Ask me anything about it.' }],
+    },
+    ...messages.map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.text }],
+    })),
+  ];
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildChatSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents,
+          generationConfig: {
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini chat request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const text = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!text) {
+      return res.status(500).json({ error: "Lumen couldn't find an answer for that yet." });
+    }
+
+    return res.json({ reply: text });
+  } catch (error) {
+    console.error('Lumen chat failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+  }
+});
 
 // Unknown API routes get a JSON 404, not the web page.
 app.use('/api', (req, res) => {
