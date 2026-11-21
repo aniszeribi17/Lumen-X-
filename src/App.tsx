@@ -14,11 +14,12 @@ import {
   RefreshCw,
   ScanEye,
   ScanSearch,
+  Send,
   ShieldCheck,
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { analyzeInput, type LumenAnalysis, type LumenLanguage } from './api';
+import { analyzeInput, chatFollowUp, type LumenAnalysis, type LumenChatMessage, type LumenLanguage } from './api';
 import { prepareImageForAnalysis } from './image';
 
 // Lumen X — one page: paste something unclear, get a clear read.
