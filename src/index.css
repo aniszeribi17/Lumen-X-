@@ -51,7 +51,11 @@
     -webkit-font-smoothing: antialiased;
   }
 }
-
+/* Native dropdown options need dark text on the white popup */
+select option {
+  color: #171717;
+  background-color: #ffffff;
+}
 /* Small mono labels used across the UI (original class name). */
 .font-mono-label {
   font-family: var(--font-mono);
