@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GEMINI_MODEL = 'gemini-3.6-flash';
-const LANGUAGE_LABELS = { ar: 'Arabic', en: 'English' };
+const LANGUAGE_LABELS = { ar: 'Arabic', en: 'English', tr: 'Turkish', de: 'German' };
 
 // Attached screenshots arrive as data URLs, which can be a few MB — allow big JSON bodies.
 app.use(express.json({ limit: '12mb' }));
