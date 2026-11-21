@@ -79,7 +79,6 @@ Be concise, concrete, and non-alarmist. Distinguish facts from guesses. Do not m
 }
 
 // Checks the model's answer has exactly the shape the frontend displays
-
 // (the original used a zod schema for this; same checks, written out).
 function isValidAnalysis(value) {
   return (
