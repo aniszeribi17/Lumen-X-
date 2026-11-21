@@ -107,6 +107,7 @@ app.post('/api/lumen/analyze', async (req, res) => {
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
   const language = body.language === 'ar' ? 'ar' : body.language === 'en' || body.language === undefined ? 'en' : null;
 
+
   if (language === null || prompt.length > 12000 || (!prompt && !imageData)) {
     return res.status(400).json({ error: 'Please add some text or a supported image.' });
   }
