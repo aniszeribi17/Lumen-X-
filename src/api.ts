@@ -43,3 +43,34 @@ export async function analyzeInput(input: LumenAnalysisInput): Promise<LumenAnal
 
   return (await response.json()) as LumenAnalysis;
 }
+export interface LumenChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface LumenChatInput {
+  prompt: string;
+  analysis: LumenAnalysis;
+  messages: LumenChatMessage[];
+  language: LumenLanguage;
+}
+
+export async function chatFollowUp(input: LumenChatInput): Promise<string> {
+  const response = await fetch('/api/lumen/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not answer that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as { reply?: string };
+  if (!body.reply) {
+    throw new Error('Lumen could not answer that yet.');
+  }
+  return body.reply;
+}
+
