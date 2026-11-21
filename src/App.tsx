@@ -429,6 +429,31 @@ function Home() {
                       <span className="hidden sm:inline">Lumen engine</span>
                     </div>
                   </div>
+                                    <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Reading mode">
+                    {(
+                      [
+                        { value: 'read', label: 'Read' },
+                        { value: 'scam', label: 'Scam check' },
+                        { value: 'conversation', label: 'Conversation' },
+                      ] as { value: LumenMode; label: string }[]
+                    ).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setMode(option.value)}
+                        data-testid={`button-mode-${option.value}`}
+                        aria-pressed={mode === option.value}
+                        className={
+                          mode === option.value
+                            ? 'rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground transition-colors'
+                            : 'rounded-lg border border-border/90 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                   
                   <textarea
                     id="lumen-prompt"
                     value={prompt}
@@ -457,6 +482,13 @@ function Home() {
                         <ImagePlus className="h-4 w-4 text-accent transition-transform group-hover:-rotate-6" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Attach image</span>
                       </button>
+                                            {speechRecognitionAvailable && (
+                        <button type="button" onClick={toggleListening} data-testid="button-voice-input" aria-pressed={isListening} className={isListening ? 'group flex items-center gap-2 rounded-lg bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                          <Mic className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                          <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Speak'}</span>
+                        </button>
+                      )}
+                      
                       <span className="font-mono-label text-[9px] tracking-[.05em] text-muted-foreground/60">{prompt.length.toLocaleString()} / 12,000</span>
                     </div>
                     <button type="submit" disabled={isAnalyzing || isImageProcessing} data-testid="button-analyze" className="group flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground shadow-[0_10px_25px_-15px_hsl(73_100%_62%/.8)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-wait disabled:opacity-65">
@@ -501,10 +533,49 @@ function Home() {
                     error={chatError}
                     language={analysisLanguage}
                   />
+                                    <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-reply-tools">
+                    <div className="flex items-center gap-2 text-accent">
+                      <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
+                      <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Reply in another tone</h2>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {[
+                        { label: 'Warmer', instruction: 'warmer and friendlier' },
+                        { label: 'Firmer', instruction: 'firmer and more direct' },
+                        { label: 'Shorter', instruction: 'much shorter and to the point' },
+                        { label: 'Formal', instruction: 'formal and professional' },
+                      ].map((tone) => (
+                        <button
+                          key={tone.label}
+                          type="button"
+                          disabled={isRewriting}
+                          onClick={() => void rewriteReply(tone.instruction)}
+                          data-testid={`button-tone-${tone.label.toLowerCase()}`}
+                          className="rounded-lg border border-border/90 px-3 py-2 text-[11px] font-semibold text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary active:translate-y-0 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {tone.label}
+                        </button>
+                      ))}
+                      {isRewriting && <span className="flex items-center text-[11px] text-muted-foreground">Rewriting...</span>}
+                    </div>
+                                                          <button type="button" onClick={() => void shareAnalysis()} data-testid="button-share-analysis" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {shareCopied ? <Check className="h-3.5 w-3.5" strokeWidth={2.2} /> : <Share2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                      {shareCopied ? 'Copied to clipboard' : 'Share this read'}
+                    </button>
+                                      
+                  </div>
+                 
                 </div>
               )}
       
-              {!isAnalyzing && view === 'empty' && !analysis && <EmptyState />}
+                            {!isAnalyzing && view === 'empty' && !analysis && (
+                <div className="space-y-3">
+                  <EmptyState />
+                  {history.length > 0 && <HistoryPanel history={history} onRestore={restoreRead} onDelete={deleteRead} />}    
+                   
+                </div>
+              )}
+              
             </div>
           </section>
 
@@ -600,6 +671,18 @@ function AnalysisResult({
   copied: boolean;
   onCopy: () => void;
 }) {
+  
+      const [copiedOption, setCopiedOption] = useState<number | null>(null);
+
+  const copyOption = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedOption(index);
+      window.setTimeout(() => setCopiedOption(null), 1800);
+    } catch {
+      setCopiedOption(null);
+    }
+  };
   return (
     <div className="space-y-3" dir={language === 'ar' ? 'rtl' : 'ltr'} data-language={language} data-testid="container-analysis-result">
       <article className="result-summary relative overflow-hidden rounded-[20px] border border-primary/25 p-5 sm:p-7">
@@ -611,7 +694,34 @@ function AnalysisResult({
         </div>
         <p className="relative mt-6 max-w-[620px] font-display text-[1.65rem] font-semibold leading-[1.15] tracking-[-.045em] text-foreground sm:text-[2rem]" data-testid="text-analysis-summary">{analysis.summary}</p>
       </article>
-
+      {analysis.risk && (
+        <article
+          className={
+            analysis.risk.level === 'high'
+              ? 'rounded-[18px] border border-destructive/40 bg-destructive/[.08] p-5 sm:p-6'
+              : analysis.risk.level === 'medium'
+                ? 'rounded-[18px] border border-accent/40 bg-accent/[.08] p-5 sm:p-6'
+                : 'rounded-[18px] border border-primary/30 bg-primary/[.06] p-5 sm:p-6'
+          }
+          data-testid="container-risk"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" strokeWidth={1.7} />
+            <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">
+              Scam risk / {analysis.risk.level}
+            </h2>
+          </div>
+          <ul className="mt-4 space-y-2.5" data-testid="list-risk-signals">
+            {analysis.risk.signals.map((signal, index) => (
+              <li key={`${signal}-${index}`} className="flex gap-3 text-sm leading-6 text-foreground">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-70" />
+                <span>{signal}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      )}
+      
       <div className="grid gap-3 sm:grid-cols-2">
         <article className="luminous-panel rounded-[18px] p-5 sm:p-6">
           <div className="flex items-center gap-2 text-accent">
@@ -650,6 +760,28 @@ function AnalysisResult({
           {copied ? 'Copied to clipboard' : 'Copy reply'}
         </button>
       </article>
+            {analysis.replyOptions && analysis.replyOptions.length > 0 && (
+        <article className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-reply-options">
+          <div className="flex items-center gap-2 text-accent">
+            <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
+            <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">More ways to say it</h2>
+          </div>
+          <div className="mt-5 space-y-3">
+            {analysis.replyOptions.map((option, index) => (
+              <div key={`${option.tone}-${index}`} className="rounded-xl border border-border/70 bg-background/35 px-4 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono-label text-[9px] uppercase tracking-[.12em] text-accent">{option.tone}</span>
+                  <button type="button" onClick={() => void copyOption(option.text, index)} data-testid={`button-copy-option-${index}`} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[10px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {copiedOption === index ? <Check className="h-3 w-3" strokeWidth={2.2} /> : <Clipboard className="h-3 w-3" strokeWidth={1.8} />}
+                    {copiedOption === index ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <p className="mt-2.5 text-sm leading-6 text-foreground">{option.text}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+      )}
     </div>
   );
 }
