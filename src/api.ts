@@ -1,7 +1,8 @@
 // The contract between the browser and our server.
 // These shapes mirror the original Lumen X API exactly — do not rename fields.
 
-export type LumenLanguage = 'ar' | 'en';
+export type LumenLanguage = 'ar' | 'en' | 'tr' | 'de';
+
 
 export interface LumenAnalysisInput {
   /** The message / paragraph the user cannot place. May be empty if an image is attached. */
