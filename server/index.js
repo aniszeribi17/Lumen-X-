@@ -173,7 +173,7 @@ app.post('/api/lumen/analyze', async (req, res) => {
   
 
 
-  if (language === null || prompt.length > 12000 || (!prompt && !imageData)) {
+  if (language === null || prompt.length > 50000 || (!prompt && !imageData)) {
     return res.status(400).json({ error: 'Please add some text or a supported image.' });
   }
 
@@ -303,7 +303,7 @@ app.post('/api/lumen/chat', async (req, res) => {
   if (
     language === null ||
     !isValidAnalysis(body.analysis) ||
-    prompt.length > 12000 ||
+    prompt.length > 50000 ||
     messages.length === 0 ||
     messages.length > 40 ||
     messages[messages.length - 1].role !== 'user' ||
