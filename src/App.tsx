@@ -25,6 +25,7 @@ import {
   Trash2,
     Volume2,
   VolumeX,
+    ScrollText,
 } from 'lucide-react';
 import { analyzeInput, chatFollowUp, type LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
@@ -89,6 +90,9 @@ function Home() {
   });
     const [voiceKind, setVoiceKind] = useState<'female' | 'male'>('female');
   const [isSpeaking, setIsSpeaking] = useState(false);
+    const [lastInput, setLastInput] = useState<{ prompt: string; imageData: string | null } | null>(null);
+  const [deepResult, setDeepResult] = useState<NonNullable<LumenAnalysis['deep']> | null>(null);
+  const [isDeepening, setIsDeepening] = useState(false);
   const [analysisPrompt, setAnalysisPrompt] = useState('');
   const [chatMessages, setChatMessages] = useState<LumenChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -127,6 +131,8 @@ function Home() {
       if (requestId !== requestIdRef.current) return; // a reset or newer request won
       setAnalysisPrompt(trimmedPrompt);
       setAnalysis(result);
+            setLastInput({ prompt: trimmedPrompt, imageData });
+      setDeepResult(null);
             setHistory((previous) => {
         const next = [
           { id: Date.now(), prompt: trimmedPrompt, analysis: result, language, mode, at: new Date().toISOString() },
@@ -277,6 +283,8 @@ function Home() {
     setIsChatting(false);
     setAnalysisPrompt(entry.prompt);
     setAnalysis(entry.analysis);
+        setLastInput(entry.prompt ? { prompt: entry.prompt, imageData: null } : null);
+    setDeepResult(null);
     setAnalysisLanguage(entry.language);
     setLanguage(entry.language);
     setMode(entry.mode);
@@ -329,7 +337,24 @@ function Home() {
     window.speechSynthesis.speak(utterance);
   };
 
-        
+          const explainDeep = async () => {
+    if (!analysis || !lastInput || isDeepening) return;
+    setIsDeepening(true);
+    setErrorMessage('');
+    try {
+      const result = await analyzeInput({ prompt: lastInput.prompt, imageData: lastInput.imageData, language, mode, deep: true });
+      if (result.deep) {
+        setDeepResult(result.deep);
+      } else {
+        setErrorMessage('Lumen could not prepare the detailed explanation. Try again.');
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Lumen could not prepare the detailed explanation.');
+    } finally {
+      setIsDeepening(false);
+    }
+  };
+
   const sendChat = async () => {
     const text = chatInput.trim();
     if (!text || !analysis || isChatting) return;
@@ -499,7 +524,7 @@ function Home() {
                     data-testid="input-lumen-prompt"
                     placeholder="Paste the message. Describe what feels off. Ask what to do next."
                     className="mt-5 min-h-[160px] w-full resize-none bg-transparent text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/55 sm:min-h-[190px] sm:text-[16px]"
-                    maxLength={12000}
+                    maxLength={50000}
                   />
                   {imageData && (
                     <div className="appear mt-3 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/[.06] p-2.5">
@@ -633,7 +658,74 @@ function Home() {
                       ))}
                     </div>
                   </div>
-                          
+                                           <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-deep">
+                    <div className="flex items-center gap-2 text-accent">
+                      <ScrollText className="h-4 w-4" strokeWidth={1.7} />
+                      <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Detailed explanation</h2>
+                    </div>
+                    {!deepResult && (
+                      <>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">Every part of the message, point by point, with the exact words from it as evidence.</p>
+                        <button type="button" onClick={() => void explainDeep()} disabled={isDeepening} data-testid="button-deep" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <ScrollText className="h-3.5 w-3.5" strokeWidth={1.8} />
+                          {isDeepening ? 'Preparing...' : 'Explain in detail'}
+                        </button>
+                      </>
+                    )}
+                    {deepResult && (
+                      <div className="mt-4 space-y-5">
+                        <p className="text-sm leading-6 text-foreground">{deepResult.overview}</p>
+                        <div className="space-y-3">
+                          {deepResult.points.map((point, index) => (
+                            <div key={index} className="rounded-xl border border-border/70 bg-background/35 px-4 py-3.5">
+                              <h3 className="text-sm font-semibold text-foreground">{point.title}</h3>
+                              <p className="mt-1 text-sm leading-6 text-muted-foreground">{point.detail}</p>
+                              {point.evidence && (
+                                <blockquote className="mt-2 border-l-2 border-primary/50 pl-3 text-sm italic leading-6 text-foreground/85">“{point.evidence}”</blockquote>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Sender tone and intent</h3>
+                          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{deepResult.senderTone}</p>
+                        </div>
+                        {deepResult.hiddenMeanings.length > 0 && (
+                          <div>
+                            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Between the lines</h3>
+                            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
+                              {deepResult.hiddenMeanings.map((item, index) => (
+                                <li key={index}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {deepResult.hardWords.length > 0 && (
+                          <div>
+                            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Hard words</h3>
+                            <ul className="mt-1.5 space-y-1 text-sm leading-6 text-muted-foreground">
+                              {deepResult.hardWords.map((item, index) => (
+                                <li key={index}>
+                                  <span className="font-semibold text-foreground">{item.word}</span> — {item.meaning}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {deepResult.ambiguities.length > 0 && (
+                          <div>
+                            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Could mean two things</h3>
+                            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
+                              {deepResult.ambiguities.map((item, index) => (
+                                <li key={index}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                                      
                   </div>
                  
                 </div>
