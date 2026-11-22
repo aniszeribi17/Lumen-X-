@@ -237,3 +237,11 @@ select option {
     scroll-behavior: auto !important;
   }
 }
+@keyframes brand-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(213 255 61 / 0); }
+  50% { box-shadow: 0 0 16px 2px rgb(213 255 61 / 0.35); }
+}
+
+.brand-mark {
+  animation: brand-breathe 3.2s ease-in-out infinite;
+    }
