@@ -1,8 +1,8 @@
 // Prepares an attached screenshot for analysis: shrinks it on a canvas so the
 // request stays small, and returns it as a data URL. Logic ported from the original app.
 
-const MAX_IMAGE_DIMENSION = 2048;
-const MAX_IMAGE_DATA_URL_LENGTH = 7_500_000;
+const MAX_IMAGE_DIMENSION = 3200;
+const MAX_IMAGE_DATA_URL_LENGTH = 10_000_000;
 
 function loadImage(sourceUrl: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -27,10 +27,10 @@ export async function prepareImageForAnalysis(file: File): Promise<string> {
     if (!context) throw new Error('Canvas is unavailable.');
 
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const webp = canvas.toDataURL('image/webp', 0.84);
+    const webp = canvas.toDataURL('image/webp', 0.95);
     if (webp.length <= MAX_IMAGE_DATA_URL_LENGTH) return webp;
 
-    const jpeg = canvas.toDataURL('image/jpeg', 0.78);
+    const jpeg = canvas.toDataURL('image/jpeg', 0.88);
     if (jpeg.length <= MAX_IMAGE_DATA_URL_LENGTH) return jpeg;
 
     // Still too large: shrink the canvas itself and try once more.
@@ -39,7 +39,7 @@ export async function prepareImageForAnalysis(file: File): Promise<string> {
     canvas.height = Math.max(1, Math.round(canvas.height * smallerScale));
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    const reducedJpeg = canvas.toDataURL('image/jpeg', 0.7);
+    const reducedJpeg = canvas.toDataURL('image/jpeg', 0.82);
     if (reducedJpeg.length > MAX_IMAGE_DATA_URL_LENGTH) {
       throw new Error('Image could not be reduced below the request limit.');
     }
