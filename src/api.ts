@@ -14,6 +14,24 @@ export interface LumenAnalysisInput {
   /** Language the analysis should be written in. */
   language: LumenLanguage;
   mode: LumenMode;
+    /** Ask for the detailed explanation with evidence. */
+  deep?: boolean;
+}
+
+export interface LumenDeepPoint {
+  title: string;
+  detail: string;
+  /** Exact quote from the user's text, or empty when there is none. */
+  evidence: string;
+}
+
+export interface LumenDeepDive {
+  overview: string;
+  points: LumenDeepPoint[];
+  senderTone: string;
+  hiddenMeanings: string[];
+  hardWords: { word: string; meaning: string }[];
+  ambiguities: string[];
 }
 
 
@@ -28,7 +46,7 @@ export interface LumenAnalysis {
   reply: string;
     replyOptions: { tone: string; text: string }[];
   risk?: { level: 'low' | 'medium' | 'high'; signals: string[] };
-  
+    deep?: LumenDeepDive;
   /** Short label for the reply's tone, e.g. "Calm and direct". */
   replyTone: string;
 }
