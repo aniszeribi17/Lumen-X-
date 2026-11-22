@@ -23,6 +23,8 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+    Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { analyzeInput, chatFollowUp, type LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
@@ -85,6 +87,8 @@ function Home() {
       return [];
     }
   });
+    const [voiceKind, setVoiceKind] = useState<'female' | 'male'>('female');
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [analysisPrompt, setAnalysisPrompt] = useState('');
   const [chatMessages, setChatMessages] = useState<LumenChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -291,7 +295,41 @@ function Home() {
     });
   };
 
-      
+        const speakAnalysis = () => {
+    if (!analysis) return;
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(`${analysis.summary}. ${analysis.reply}`);
+    const langByLanguage: Record<LumenLanguage, string> = {
+      ar: 'ar',
+      en: 'en',
+      tr: 'tr',
+      de: 'de',
+      pt: 'pt',
+    };
+    const prefix = langByLanguage[analysisLanguage];
+    utterance.lang = prefix;
+    const voices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => voice.lang.toLowerCase().startsWith(prefix));
+    const femaleHints = ['female', 'woman', 'zira', 'samantha', 'kate', 'serena', 'moira', 'fiona', 'amelie', 'anna', 'katja', 'luciana', 'filiz'];
+    const maleHints = ['male', 'man', 'david', 'daniel', 'george', 'arthur', 'thomas', 'pavel', 'emre', 'jorge'];
+    const hints = voiceKind === 'female' ? femaleHints : maleHints;
+    const picked =
+      voices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint))) ??
+      (voiceKind === 'female' ? voices[0] : voices[1] ?? voices[0]);
+    if (picked) utterance.voice = picked;
+    utterance.pitch = voiceKind === 'female' ? 1.1 : 0.85;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+        
   const sendChat = async () => {
     const text = chatInput.trim();
     if (!text || !analysis || isChatting) return;
@@ -562,7 +600,40 @@ function Home() {
                       {shareCopied ? <Check className="h-3.5 w-3.5" strokeWidth={2.2} /> : <Share2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
                       {shareCopied ? 'Copied to clipboard' : 'Share this read'}
                     </button>
-                                      
+                                            <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-voice">
+                    <div className="flex items-center gap-2 text-accent">
+                      <Volume2 className="h-4 w-4" strokeWidth={1.7} />
+                      <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Listen to this read</h2>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={speakAnalysis} data-testid="button-listen" className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {isSpeaking ? <VolumeX className="h-3.5 w-3.5" strokeWidth={1.8} /> : <Volume2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                        {isSpeaking ? 'Stop' : 'Listen'}
+                      </button>
+                      {(
+                        [
+                          { value: 'female', label: 'Female voice' },
+                          { value: 'male', label: 'Male voice' },
+                        ] as { value: 'female' | 'male'; label: string }[]
+                      ).map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setVoiceKind(option.value)}
+                          data-testid={`button-voice-${option.value}`}
+                          aria-pressed={voiceKind === option.value}
+                          className={
+                            voiceKind === option.value
+                              ? 'rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground transition-colors'
+                              : 'rounded-lg border border-border/90 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                          
                   </div>
                  
                 </div>
