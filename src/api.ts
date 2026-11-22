@@ -50,10 +50,27 @@ export interface LumenAnalysis {
   /** Short label for the reply's tone, e.g. "Calm and direct". */
   replyTone: string;
 }
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const response = await fetch(url, init);
+      if (response.status !== 502 && response.status !== 503) return response;
+      lastError = new Error(`Request failed with status ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 900 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Request failed.');
+}
 
 /** Send the input to our server and return the analysis. Throws an Error with a readable message on failure. */
 export async function analyzeInput(input: LumenAnalysisInput): Promise<LumenAnalysis> {
-  const response = await fetch('/api/lumen/analyze', {
+  const response = await fetchWithRetry
+    ('/api/lumen/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -80,7 +97,8 @@ export interface LumenChatInput {
 }
 
 export async function chatFollowUp(input: LumenChatInput): Promise<string> {
-  const response = await fetch('/api/lumen/chat', {
+  const response = await fetchWithRetry
+    ('/api/lumen/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
