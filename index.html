@@ -19,12 +19,53 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" sizes="1024x1024" href="/x-logo.png?v=3" />
     <link rel="apple-touch-icon" sizes="1024x1024" href="/x-logo.png?v=3" />
+        <style>
+      #lumen-splash { position: fixed; inset: 0; z-index: 9999; background: #0a0b0a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; transition: opacity 450ms ease; }
+      #lumen-splash.hide { opacity: 0; pointer-events: none; }
+      #lumen-splash .splash-logo { position: relative; width: 104px; height: 104px; border-radius: 26px; overflow: hidden; }
+      #lumen-splash .splash-logo img { width: 100%; height: 100%; display: block; animation: splash-clarify 1.8s ease-in-out infinite; }
+      #lumen-splash .splash-logo::after { content: ''; position: absolute; top: -20%; bottom: -20%; left: 0; width: 45%; background: linear-gradient(100deg, transparent, rgb(213 255 61 / 0.35), rgb(255 255 255 / 0.55), transparent); transform: translateX(-160%) skewX(-12deg); animation: splash-beam 1.8s ease-in-out infinite; }
+      @keyframes splash-clarify { 0% { filter: blur(6px) brightness(0.55); } 45%, 70% { filter: blur(0) brightness(1.05); } 100% { filter: blur(6px) brightness(0.55); } }
+      @keyframes splash-beam { 0% { transform: translateX(-160%) skewX(-12deg); } 45%, 100% { transform: translateX(340%) skewX(-12deg); } }
+      #lumen-splash .splash-name { color: #f2f5e9; font-family: Inter, system-ui, sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+      #lumen-splash .splash-name span { color: #d5ff3d; }
+      #lumen-splash .splash-tag { color: #9aa48f; font-family: system-ui, sans-serif; font-size: 14px; }
+      #lumen-splash .splash-diamonds { display: flex; gap: 12px; }
+      #lumen-splash .splash-diamonds i { width: 9px; height: 9px; background: #d5ff3d; transform: rotate(45deg); opacity: 0.25; animation: splash-diamond 1.2s ease-in-out infinite; }
+      #lumen-splash .splash-diamonds i:nth-child(2) { animation-delay: 0.18s; }
+      #lumen-splash .splash-diamonds i:nth-child(3) { animation-delay: 0.36s; }
+      @keyframes splash-diamond { 0%, 100% { opacity: 0.25; box-shadow: 0 0 0 0 rgb(213 255 61 / 0); } 50% { opacity: 1; box-shadow: 0 0 12px 2px rgb(213 255 61 / 0.55); } }
+        </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
+        <div id="lumen-splash" aria-hidden="true">
+      <div class="splash-logo"><img src="/x-logo.png?v=3" alt="" /></div>
+      <div class="splash-name">lumen <span>x</span></div>
+      <div class="splash-tag">Your life, clearer.</div>
+      <div class="splash-diamonds"><i></i><i></i><i></i></div>
+        </div>
     <script type="module" src="/src/main.tsx"></script>
+        <script>
+      (function () {
+        var started = Date.now();
+        function hideSplash() {
+          var splash = document.getElementById('lumen-splash');
+          if (!splash || splash.classList.contains('hide')) return;
+          var wait = Math.max(0, 650 - (Date.now() - started));
+          setTimeout(function () {
+            splash.classList.add('hide');
+            setTimeout(function () { splash.remove(); }, 500);
+          }, wait);
+        }
+        window.addEventListener('load', hideSplash);
+        setTimeout(hideSplash, 2600);
+      })();
+        </script>
   </body>
 </html>
+    
+          
