@@ -154,7 +154,62 @@ Return ONLY valid JSON with this exact shape:
 The entire response's user-facing values — including summary, every whatItMeans bullet, nextStep, reply, replyTone, and every replyOptions text — MUST be written strictly in ${languageLabel}. Do not mix languages. Keep the JSON property names exactly as shown above.
 Be concise, concrete, and non-alarmist. Distinguish facts from guesses. Do not mention that you are an AI.`;
 }
+function buildDeepSystemPrompt(languageLabel) {
+  return `You are Lumen, a thoughtful assistant that helps people understand confusing messages, screens, documents, and everyday situations. This time the user asked for a DETAILED explanation: everything about the message, broken down point by point, with evidence.
 
+Return ONLY valid JSON with this exact shape:
+{
+  "summary": "one clear sentence that says what this is about",
+  "whatItMeans": ["2 to 4 short bullets explaining the important meaning in plain language"],
+  "nextStep": "the single most useful thing the user should do next",
+  "reply": "a natural, appropriate message the user could send if a reply makes sense; if not, say why in a gentle sentence",
+  "replyOptions": [{"tone": "Safe and polite", "text": "one alternative reply in that tone"}, {"tone": "Direct", "text": "one alternative reply in that tone"}, {"tone": "Warm", "text": "one alternative reply in that tone"}],
+  "replyTone": "a short label such as Warm and clear, Professional, or Brief and direct",
+  "deep": {
+    "overview": "a full plain-language explanation of the whole message, 3 to 6 sentences, no jargon",
+    "points": [{"title": "a short label for one part of the message", "detail": "what this part means and why it matters", "evidence": "the exact words from the user's text that support this, copied word for word; empty string if there is no direct quote"}],
+    "senderTone": "the sender's tone and likely intent, in one or two sentences",
+    "hiddenMeanings": ["things implied but not said directly; empty array if there are none"],
+    "hardWords": [{"word": "a difficult word or phrase from the text", "meaning": "what it means in simple words"}],
+    "ambiguities": ["places where the message could honestly mean two different things; empty array if there are none"]
+  }
+}
+
+Rules for the deep section:
+- Cover the message point by point: 3 to 6 points, in the order they appear in the message.
+- Evidence MUST be copied word for word from the user's text. Never invent, shorten, or rephrase a quote. If a point has no direct quote, use an empty string.
+- hardWords: only include words a normal reader might not know; if there are none, use an empty array.
+- The entire response's user-facing values MUST be written strictly in ${languageLabel}. Do not mix languages. Keep the JSON property names exactly as shown above.
+Be concrete and non-alarmist. Distinguish facts from guesses. Do not mention that you are an AI.`;
+}
+
+function validDeep(value) {
+  if (value === null || typeof value !== 'object') return null;
+  if (typeof value.overview !== 'string' || typeof value.senderTone !== 'string') return null;
+  if (!Array.isArray(value.points)) return null;
+  const points = value.points
+    .filter((point) => point !== null && typeof point === 'object' && typeof point.title === 'string' && typeof point.detail === 'string')
+    .slice(0, 6)
+    .map((point) => ({ title: point.title, detail: point.detail, evidence: typeof point.evidence === 'string' ? point.evidence : '' }));
+  if (points.length === 0) return null;
+  const strings = (list) => (Array.isArray(list) ? list.filter((item) => typeof item === 'string').slice(0, 6) : []);
+  const hardWords = Array.isArray(value.hardWords)
+    ? value.hardWords
+        .filter((item) => item !== null && typeof item === 'object' && typeof item.word === 'string' && typeof item.meaning === 'string')
+        .slice(0, 8)
+        .map((item) => ({ word: item.word, meaning: item.meaning }))
+    : [];
+  return {
+    overview: value.overview,
+    points,
+    senderTone: value.senderTone,
+    hiddenMeanings: strings(value.hiddenMeanings),
+    hardWords,
+    ambiguities: strings(value.ambiguities),
+  };
+}
+
+                             
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -170,6 +225,7 @@ app.post('/api/lumen/analyze', async (req, res) => {
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
   const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language) ? body.language : body.language === undefined ? 'en' : null;
   const mode = ['read', 'scam', 'conversation'].includes(body.mode) ? body.mode : 'read';
+    const deep = body.deep === true;
   
 
 
@@ -227,7 +283,8 @@ ${prompt}`
                     ? buildScamSystemPrompt(LANGUAGE_LABELS[language])
                     : mode === 'conversation'
                       ? buildConversationSystemPrompt(LANGUAGE_LABELS[language])
-                      : buildSystemPrompt(LANGUAGE_LABELS[language]),
+                                            : deep ? buildDeepSystemPrompt(LANGUAGE_LABELS[language]) : buildSystemPrompt(LANGUAGE_LABELS[language]),
+                
               },
             ],
             
@@ -235,7 +292,8 @@ ${prompt}`
           contents: [{ role: 'user', parts }],
           generationConfig: {
             responseMimeType: 'application/json',
-            maxOutputTokens: 8192,
+                        maxOutputTokens: deep ? 16384 : 8192,
+         
           },
         }),
       });
@@ -272,6 +330,8 @@ ${prompt}`
 
           replyOptions: validReplyOptions(result.replyOptions),
       ...(mode === 'scam' && isValidRisk(result.risk) ? { risk: result.risk } : {}),
+            ...(deep && validDeep(result.deep) ? { deep: validDeep(result.deep) } : {}),
+       
     });
   } catch (error) {
     console.error('Lumen analysis failed:', error);
