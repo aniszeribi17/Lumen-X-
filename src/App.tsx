@@ -785,6 +785,41 @@ function AnalysisResult({
     </div>
   );
 }
+function HistoryPanel({
+  history,
+  onRestore,
+  onDelete,
+}: {
+  history: SavedRead[];
+  onRestore: (entry: SavedRead) => void;
+  onDelete: (id: number) => void;
+}) {
+  return (
+    <article className="luminous-panel rounded-[20px] p-5 sm:p-7" data-testid="container-history">
+      <div className="flex items-center gap-2 text-accent">
+        <History className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">My past reads</h2>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">Saved on this device only. Tap one to reopen it.</p>
+      <div className="mt-4 space-y-2">
+        {history.map((entry) => (
+          <div key={entry.id} className="group flex items-center gap-2 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 transition-colors hover:border-primary/30">
+            <button type="button" onClick={() => onRestore(entry)} data-testid={`button-history-${entry.id}`} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="block truncate text-sm font-medium text-foreground">{entry.analysis.summary}</span>
+              <span className="mt-0.5 block font-mono-label text-[9px] uppercase tracking-[.1em] text-muted-foreground">
+                {new Date(entry.at).toLocaleDateString()} / {entry.mode} / {entry.language}
+              </span>
+            </button>
+            <button type="button" onClick={() => onDelete(entry.id)} data-testid={`button-history-delete-${entry.id}`} aria-label="Delete this saved read" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <X className="h-4 w-4" strokeWidth={1.7} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function FollowUpChat({
   messages,
   input,
