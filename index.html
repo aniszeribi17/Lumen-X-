@@ -12,13 +12,13 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Lumen X" />
     <meta name="twitter:description" content="Lumen X understands what you are seeing, explains what it means, and helps you decide what to do next." />
-    <meta name="theme-color" content="#2d6e5f" />
+    <meta name="theme-color" content="#0a0b0a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Lumen X" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/png" sizes="1024x1024" href="/x-logo.png?v=3" />
-    <link rel="apple-touch-icon" sizes="1024x1024" href="/x-logo.png?v=3" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="1024x1024" href="/icon-512.png" />
         <style>
       #lumen-splash { position: fixed; inset: 0; z-index: 9999; background: #0a0b0a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; transition: opacity 450ms ease; }
       #lumen-splash.hide { opacity: 0; pointer-events: none; }
@@ -43,7 +43,7 @@
   <body>
     <div id="root"></div>
         <div id="lumen-splash" aria-hidden="true">
-      <div class="splash-logo"><img src="/x-logo.png?v=3" alt="" /></div>
+      <div class="splash-logo"><img src="/icon-512.png" alt="" /></div>
       <div class="splash-name">lumen <span>x</span></div>
       <div class="splash-tag">Your life, clearer.</div>
       <div class="splash-diamonds"><i></i><i></i><i></i></div>
@@ -64,6 +64,13 @@
         window.addEventListener('load', hideSplash);
         setTimeout(hideSplash, 2600);
       })();
+        </script>
+        <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
         </script>
   </body>
 </html>
