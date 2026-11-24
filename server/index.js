@@ -87,6 +87,24 @@ Help with things like: explaining the analysis further, drafting or improving a 
 
 Answer in plain text, strictly in ${languageLabel}. Do not mix languages. Be concise, concrete, and non-alarmist. Distinguish facts from guesses. Do not mention that you are an AI.`;
 }
+function buildSupportSystemPrompt(languageLabel) {
+  return `You are Lumen's support companion: a calm, warm listener who helps the user steady themselves and think clearly about what they are feeling. This is a supportive conversation, not a follow-up about an analysis.
+
+What you do:
+- Listen first. Reflect back what the user is carrying, in their own terms, so they feel heard before anything else.
+- Help them organize tangled thoughts: what is known, what is feared, and what is still unknown.
+- Separate facts from fears gently, without arguing, correcting harshly, or dismissing what they feel.
+- When it fits, offer one small, doable step toward balance — rest, a pause, writing it down, a walk, talking to someone they trust. Never a treatment plan.
+- Ask one gentle question at a time instead of lecturing. Short, human replies are better than long ones.
+
+Your limits — never cross them:
+- You are NOT a doctor, therapist, or counselor, and you must never present yourself as one. Do not repeat the reminder in every message; the app already states it once at the top of this space.
+- Never diagnose, never tell the user they have a condition, never suggest medication or any form of treatment.
+- Offer readings of the user's state as possibilities, never as verdicts or certainties.
+- If the user talks about harming themselves or not wanting to live, take it seriously: respond with care, encourage them to reach out right away to someone they trust, a local emergency number, or a professional, and stay with them in the conversation.
+
+Answer in plain text, strictly in ${languageLabel}. Do not mix languages. Warm, calm, and concise — a few short paragraphs at most.`;
+}
 
 // Checks the model's answer has exactly the shape the frontend displays
 // (the original used a zod schema for this; same checks, written out).
@@ -455,7 +473,103 @@ ${JSON.stringify(body.analysis)}`,
     return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
   }
 });
+app.post('/api/lumen/support', async (req, res) => {
+  const body = req.body ?? {};
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
 
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+  const messages = rawMessages
+    .filter(
+      (message) =>
+        message !== null &&
+        typeof message === 'object' &&
+        (message.role === 'user' || message.role === 'assistant') &&
+        typeof message.text === 'string' &&
+        message.text.trim().length > 0,
+    )
+    .map((message) => ({ role: message.role, text: message.text.trim() }));
+  const totalChars = messages.reduce((sum, message) => sum + message.text.length, 0);
+
+  if (
+    language === null ||
+    messages.length === 0 ||
+    messages.length > 40 ||
+    messages[messages.length - 1].role !== 'user' ||
+    messages.some((message) => message.text.length > 4000) ||
+    totalChars > 30000
+  ) {
+    return res.status(400).json({ error: 'Please write what is on your mind.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  const contents = messages.map((message) => ({
+    role: message.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: message.text }],
+  }));
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildSupportSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents,
+          generationConfig: {
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini support request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const text = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!text) {
+      return res.status(500).json({ error: "Lumen couldn't find an answer for that yet." });
+    }
+
+    return res.json({ reply: text });
+  } catch (error) {
+    console.error('Lumen support failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+  }
+});
+         
 // Unknown API routes get a JSON 404, not the web page.
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
