@@ -453,6 +453,11 @@ function Home() {
 
                 </select>
               </label>
+                            <button type="button" onClick={() => setSupportOpen((open) => !open)} data-testid="button-support-toggle" aria-pressed={supportOpen} className="flex items-center gap-2 rounded-lg border border-border/90 bg-card/50 px-2.5 py-2 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                <Heart className="h-3.5 w-3.5 text-accent" strokeWidth={1.7} />
+                <span className="hidden sm:inline">Support</span>
+              </button>
+              
             </div>
           </header>
 
@@ -553,6 +558,8 @@ function Home() {
                       )}
                       
                       <span className="font-mono-label text-[9px] tracking-[.05em] text-muted-foreground/60">{prompt.length.toLocaleString()} / 50,000</span>
+                                    
+                      
                     </div>
                     <button type="submit" disabled={isAnalyzing || isImageProcessing} data-testid="button-analyze" className="group flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground shadow-[0_10px_25px_-15px_hsl(73_100%_62%/.8)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-wait disabled:opacity-65">
                       {isImageProcessing ? (
@@ -581,7 +588,22 @@ function Home() {
               </p>
             </div>
 
-            <div className="appear appear-delay-3 lg:col-start-2">
+            <div className="appear appear-delay-3 lg:col-start-2">              {supportOpen && (
+                    {supportOpen && (
+      
+                <div className="mb-3">
+                  <SupportChat
+                    messages={supportMessages}
+                    input={supportInput}
+                    onInputChange={setSupportInput}
+                    onSend={() => void sendSupport()}
+                    isSending={isSupporting}
+                    error={supportError}
+                    language={language}
+                  />
+                </div>
+              )}
+              
               {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
                             {!isAnalyzing && view === 'result' && analysis && (
@@ -1054,6 +1076,91 @@ function FollowUpChat({
           className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
         />
         <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-chat" aria-label="Send follow-up question" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+          <Send className="h-4 w-4" strokeWidth={1.9} />
+        </button>
+      </form>
+    </article>
+  );
+}
+const SUPPORT_INTRO: Record<LumenLanguage, string> = {
+  ar: 'هذه مساحة هادئة للكلام على ما بداخلك. أنا مساعد دعم داخل التطبيق: أسمعك، وأساعدك ترتب أفكارك وتفرق بين الحقائق والمخاوف، وترجع لتوازنك. أنا لست طبيباً ولا معالجاً، ولا أشخّص ولا أعالج — وإذا كان ما تمر به ثقيلاً أو مستمراً، فالمختص الحقيقي هو الباب الصحيح.',
+  en: 'A calm space to talk through what is on your mind. I am a support companion inside this app: I listen, help you organize your thoughts, separate facts from fears, and find your balance again. I am not a doctor or a therapist — I do not diagnose or treat. If what you are carrying feels heavy or lasting, a real professional is the right door.',
+  tr: 'Zihnindekileri konuşmak için sakin bir alan. Ben bu uygulamanın içindeki bir destek arkadaşıyım: seni dinlerim, düşüncelerini düzenlemene, gerçekleri korkulardan ayırmana ve dengeni yeniden bulmana yardım ederim. Doktor ya da terapist değilim; tanı koymam, tedavi önermem. Taşıdığın şey ağır ya da kalıcı geliyorsa, doğru kapı gerçek bir uzmandır.',
+  de: 'Ein ruhiger Raum, um auszusprechen, was dich beschäftigt. Ich bin ein Begleiter zur Unterstützung in dieser App: Ich höre zu, helfe dir, deine Gedanken zu ordnen, Fakten von Ängsten zu trennen und dein Gleichgewicht wiederzufinden. Ich bin kein Arzt und kein Therapeut — ich stelle keine Diagnosen und behandle nicht. Wenn das, was du trägst, schwer oder anhaltend ist, ist ein echter Fachmann die richtige Tür.',
+  pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
+};
+
+function SupportChat({
+  messages,
+  input,
+  onInputChange,
+  onSend,
+  isSending,
+  error,
+  language,
+}: {
+  messages: LumenChatMessage[];
+  input: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+  isSending: boolean;
+  error: string;
+  language: LumenLanguage;
+}) {
+  const handleSupportSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSend();
+  };
+
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-support-chat">
+      <div className="flex items-center gap-2 text-accent">
+        <Heart className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">A calmer space</h2>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{SUPPORT_INTRO[language]}</p>
+
+      {messages.length > 0 && (
+        <div className="mt-5 space-y-2.5" data-testid="list-support-messages">
+          {messages.map((message, index) => (
+            <div
+              key={`${message.role}-${index}`}
+              className={
+                message.role === 'user'
+                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
+                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
+              }
+            >
+              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
+                {message.role === 'user' ? 'You' : 'Lumen'}
+              </span>
+              <span className="whitespace-pre-wrap">{message.text}</span>
+            </div>
+          ))}
+          {isSending && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              Lumen is listening...
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-support-error">{error}</p>
+      )}
+
+      <form onSubmit={handleSupportSubmit} className="mt-5 flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(event) => onInputChange(event.target.value)}
+          data-testid="input-support-message"
+          placeholder="Say what is on your mind..."
+          maxLength={4000}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+        />
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-support" aria-label="Send to support" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
           <Send className="h-4 w-4" strokeWidth={1.9} />
         </button>
       </form>
