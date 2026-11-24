@@ -400,7 +400,7 @@ function Home() {
 
   return (
     <main className="lumen-shell min-h-[100dvh] w-full">
-      <div className="lumen-orbit -right-48 top-20 hidden lg:block" aria-hidden="true" />
+      
       <div className="relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-[1480px] gap-4 px-4 py-4 sm:px-6 lg:gap-6 lg:px-8 lg:py-6">
         <aside className="lumen-rail hidden w-[76px] shrink-0 flex-col items-center justify-between rounded-[22px] py-5 lg:flex">
           <div className="flex flex-col items-center gap-9">
