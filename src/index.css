@@ -67,14 +67,10 @@ select option {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 82% 4%, rgb(213 255 61 / 0.07), transparent 25rem),
-    radial-gradient(circle at 10% 58%, rgb(79 225 248 / 0.045), transparent 28rem),
-    #0f1015;
-}
+    background: #0a0b0a;
 
 .lumen-shell::before {
-  content: '';
+  
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -88,7 +84,7 @@ select option {
 }
 
 .lumen-shell::after {
-  content: '';
+  
   position: fixed;
   inset: 0;
   pointer-events: none;
