@@ -617,7 +617,7 @@ function Home() {
             </div>
 
             <div className="appear appear-delay-3 lg:col-start-2">              {supportOpen && (
-                    {supportOpen && (
+                  
       
                 <div className="mb-3">
                   <SupportChat
