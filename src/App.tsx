@@ -489,13 +489,16 @@ function Home() {
             </div>
           </header>
 
-          <section className="mx-auto grid w-full max-w-[1260px] flex-1 items-start gap-9 pb-5 pt-10 sm:pt-14 lg:grid-cols-[minmax(280px,.72fr)_minmax(500px,1.28fr)] lg:gap-x-20 lg:gap-y-10 lg:pb-10 lg:pt-20">
-            <div className="appear appear-delay-1 max-w-[480px]">
+          <section className="mx-auto grid grid-cols-[minmax(0,1fr)] w-full
+            max-w-[1260px] flex-1 items-start gap-9 pb-5 pt-10 sm:pt-14 lg:grid-cols-[minmax(280px,.72fr)_minmax(500px,1.28fr)] lg:gap-x-20 lg:gap-y-10 lg:pb-10 lg:pt-20">
+            <div className="appear-delay-1 min-w-0 max-w-[480px]
+              ">
               <div className="mb-6 flex items-center gap-3">
                 <span className="font-mono-label text-[9px] uppercase tracking-[.24em] text-primary">L / 01 — Read the room</span>
                 <span className="signal-line h-px w-12" />
               </div>
-              <h1 className="font-display text-balance text-[3.15rem] font-semibold leading-[.93] tracking-[-.068em] text-foreground sm:text-[4.5rem] lg:text-[5.1rem]">
+              <h1 className="font-display text-balance text-[2.5rem]
+                font-semibold leading-[.93] tracking-[-.068em] text-foreground sm:text-[4.5rem] lg:text-[5.1rem]">
                 Turn<br />
                 <span className="text-primary">uncertainty</span><br />
                 into signal.
@@ -616,7 +619,8 @@ function Home() {
               </p>
             </div>
 
-            <div className="appear appear-delay-3 lg:col-start-2">              {supportOpen && (
+            <div className="appear appear-delay-3 min-w-0 lg:col-start-2
+              ">              {supportOpen && (
                   
       
                 <div className="mb-3">
