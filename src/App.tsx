@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Clipboard,
   Eye,
+    Heart,
     History,
   ImagePlus,
   Languages,
@@ -27,7 +28,7 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, type LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
+import { analyzeInput, chatFollowUp, supportChat, type LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
 
 // Lumen X — one page: paste something unclear, get a clear read.
@@ -98,7 +99,13 @@ function Home() {
   const [chatInput, setChatInput] = useState('');
   const [chatError, setChatError] = useState('');
   const [isChatting, setIsChatting] = useState(false);
+    const [supportOpen, setSupportOpen] = useState(false);
+  const [supportMessages, setSupportMessages] = useState<LumenChatMessage[]>([]);
+  const [supportInput, setSupportInput] = useState('');
+  const [supportError, setSupportError] = useState('');
+  const [isSupporting, setIsSupporting] = useState(false);
   const chatRequestIdRef = useRef(0);
+    const supportRequestIdRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Counts requests so a slow, older answer can never overwrite a newer one.
   const requestIdRef = useRef(0);
@@ -378,6 +385,27 @@ function Home() {
       setChatError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
     } finally {
       if (chatRequestId === chatRequestIdRef.current) setIsChatting(false);
+    }
+  };
+  
+  const sendSupport = async () => {
+    const text = supportInput.trim();
+    if (!text || isSupporting) return;
+    const nextMessages: LumenChatMessage[] = [...supportMessages, { role: 'user', text }];
+    setSupportMessages(nextMessages);
+    setSupportInput('');
+    setSupportError('');
+    setIsSupporting(true);
+    const supportRequestId = ++supportRequestIdRef.current;
+    try {
+      const reply = await supportChat({ messages: nextMessages, language });
+      if (supportRequestId !== supportRequestIdRef.current) return;
+      setSupportMessages([...nextMessages, { role: 'assistant', text: reply }]);
+    } catch (error) {
+      if (supportRequestId !== supportRequestIdRef.current) return;
+      setSupportError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+    } finally {
+      if (supportRequestId === supportRequestIdRef.current) setIsSupporting(false);
     }
   };
                                               
