@@ -1163,7 +1163,85 @@ const SUPPORT_INTRO: Record<LumenLanguage, string> = {
   pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
 };
 
-function SupportChat({
+function GeneralChat({
+  messages,
+  input,
+  onInputChange,
+  onSend,
+  isSending,
+  error,
+  language,
+}: {
+  messages: LumenChatMessage[];
+  input: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+  isSending: boolean;
+  error: string;
+  language: LumenLanguage;
+}) {
+  const handleTalkSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSend();
+  };
+
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-general-chat">
+      <div className="flex items-center gap-2 text-accent">
+        <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your chat</h2>
+      </div>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Ask me anything — a question, an idea, a draft, a decision. I answer here, in your language.</p>
+
+      {messages.length > 0 && (
+        <div className="mt-5 space-y-2.5" data-testid="list-talk-messages">
+          {messages.map((message, index) => (
+            <div
+              key={`${message.role}-${index}`}
+              className={
+                message.role === 'user'
+                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
+                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
+              }
+            >
+              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
+                {message.role === 'user' ? 'You' : 'Lumen'}
+              </span>
+              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
+            </div>
+          ))}
+          {isSending && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              Lumen is thinking...
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-talk-error">{error}</p>
+      )}
+
+      <form onSubmit={handleTalkSubmit} className="mt-5 flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(event) => onInputChange(event.target.value)}
+          data-testid="input-talk-message" dir="ltr"
+          placeholder="Ask anything..."
+          maxLength={4000}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+        />
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-talk" aria-label="Send message" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+          <Send className="h-4 w-4" strokeWidth={1.9} />
+        </button>
+      </form>
+    </article>
+  );
+}
+
+                function SupportChat({
   messages,
   input,
   onInputChange,
