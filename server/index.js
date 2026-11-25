@@ -156,7 +156,41 @@ function isValidRisk(value) {
   );
 }
 
-function buildScamSystemPrompt(languageLabel) {
+function buildImageSystemPrompt(languageLabel) {
+  return `You are Lumen, the assistant inside the Lumen X app, looking at an image the user shared — it may be a screenshot, a photo, a document, a product, a message, an account page, or anything else. Your job: tell the user exactly what this image is, give a final verdict, say what to do, and explain how to handle it.
+
+Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
+
+Rules:
+- Read every visible word in the image exactly as written; quote the important lines as evidence.
+- Describe only what is actually visible. Never invent details, names, prices, or intentions that are not in the image.
+- If the image is a message, offer, or account, say who it appears to be from and what it wants from the user.
+- Watch for manipulation and scam signals — pressure, urgency, fake prizes, impersonation, threats — and name them plainly when they are present.
+- If the image is blurry or unreadable, say so honestly in the verdict instead of guessing.
+
+Answer with ONLY a JSON object in exactly this shape, with every text value strictly in ${languageLabel}:
+{
+  "whatItIs": "one clear line: what this image is",
+  "details": ["the key things visible, one per item, 3 to 6 items, quoting visible text where it matters"],
+  "verdict": "the final judgment: what this really is and whether it is safe, real, or worth acting on",
+  "whatToDo": ["concrete steps for the user, one per item, 2 to 5 items"],
+  "howToHandle": "how to deal with the person or situation behind the image: the approach, the tone, and what to say or avoid"
+}`;
+}
+
+function isValidImageRead(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.whatItIs === 'string' && value.whatItIs.length > 0 &&
+    Array.isArray(value.details) && value.details.length > 0 && value.details.every((item) => typeof item === 'string') &&
+    typeof value.verdict === 'string' && value.verdict.length > 0 &&
+    Array.isArray(value.whatToDo) && value.whatToDo.length > 0 && value.whatToDo.every((item) => typeof item === 'string') &&
+    typeof value.howToHandle === 'string' && value.howToHandle.length > 0
+  );
+}
+
+      function buildScamSystemPrompt(languageLabel) {
   return `You are Lumen, a thoughtful assistant that helps people check whether a message, offer, or request might be a scam or fraud.
 Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
 
@@ -688,7 +722,108 @@ app.post('/api/lumen/general-chat', async (req, res) => {
   }
 });
 
-// Unknown API routes get a JSON 404, not the web page.
+app.post('/api/lumen/image', async (req, res) => {
+  const body = req.body ?? {};
+  const question = typeof body.question === 'string' ? body.question.trim() : '';
+  const imageData =
+    typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  if (language === null || !imageData || question.length > 2000) {
+    return res.status(400).json({ error: 'Please add an image first.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  const parts = [
+    {
+      text: question
+        ? `The user asks about this image:\n${question}`
+        : 'The user shared this image without a question. Explain what it is, give a verdict, and say what to do.',
+    },
+  ];
+
+  try {
+    parts.push({ inlineData: parseImageData(imageData) });
+  } catch (error) {
+    console.warn('Invalid image data received:', error);
+    return res.status(400).json({ error: 'That image could not be read. Try uploading it again.' });
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildImageSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents: [{ role: 'user', parts }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini image request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't read that image. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const text = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!text) {
+      return res.status(500).json({ error: "Lumen couldn't find enough detail in that image yet." });
+    }
+
+    const result = JSON.parse(stripJsonFences(text));
+    if (!isValidImageRead(result)) {
+      throw new Error('Gemini answer did not match the expected shape.');
+    }
+    return res.json({
+      whatItIs: result.whatItIs,
+      details: result.details,
+      verdict: result.verdict,
+      whatToDo: result.whatToDo,
+      howToHandle: result.howToHandle,
+    });
+  } catch (error) {
+    console.error('Lumen image analysis failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't read that image. Please try again." });
+  }
+});
+
+      // Unknown API routes get a JSON 404, not the web page.
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
 });
