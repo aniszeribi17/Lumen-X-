@@ -6,6 +6,7 @@ import {
   Copy,
     Compass,
     GraduationCap,
+    Search,
   CircleAlert,
   Clipboard,
   Eye,
@@ -34,12 +35,14 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, adviseMe, solveStudy,
+import { analyzeInput, chatFollowUp, adviseMe, 
         
          analyzeImage, checkShield, generalChat
        , supportChat, type
         
-        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenAdvisorRead, type LumenStudyRead,
+        LumenAnalysis, type LumenChatMessage, type LumenStudyRead, type LumenResearchResult,
+        typesolveStudy, researchTopic,
+        LumenAdvisorRead, type LumenStudyRead,
         
         type LumenLanguage, type LumenShieldRead
         
@@ -156,6 +159,12 @@ function Home() {
   const [studyError, setStudyError] = useState('');
   const [isSolving, setIsSolving] = useState(false);
   const [isStudyImageProcessing, setIsStudyImageProcessing] = useState(false);
+    const [researchOpen, setResearchOpen] = useState(false);
+  const [researchQuestion, setResearchQuestion] = useState('');
+  const [researchResult, setResearchResult] = useState<LumenResearchResult | null>(null);
+  const [researchError, setResearchError] = useState('');
+  const [isResearching, setIsResearching] = useState(false);
+  
   
   
   
@@ -605,6 +614,20 @@ function Home() {
       setIsSolving(false);
     }
   };
+    const sendResearch = async () => {
+    if (!researchQuestion.trim() || isResearching) return;
+    setIsResearching(true);
+    setResearchError('');
+    try {
+      const result = await researchTopic({ question: researchQuestion.trim(), language });
+      setResearchResult(result);
+    } catch (error) {
+      setResearchError(error instanceof Error && error.message ? error.message : 'Lumen could not research that. Check your connection and try again.');
+    } finally {
+      setIsResearching(false);
+    }
+  };
+  
   
   
   
@@ -821,7 +844,8 @@ function Home() {
                         <span className="hidden sm:inline">Your Advisor</span>
 
                                               </button>
-                      <button type="button" onClick={() => { setStudyOpen((open) => !open); setAdvisorOpen(false); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-study-composer" aria-pressed={studyOpen} className={studyOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                      <button type="button" onClick={() => { setStudyOpen((open) => !open); setAdvisorOpen(false); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setResearchOpen(false); }}
+                        data-testid="button-study-composer" aria-pressed={studyOpen} className={studyOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <GraduationCap className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Study</span>
                         
@@ -963,6 +987,20 @@ function Home() {
                         />
                       </div>
                     )}
+                                  {researchOpen && (
+                      <div className="mb-3">
+                        <ResearchDoor
+                          question={researchQuestion}
+                          result={researchResult}
+                          error={researchError}
+                          isResearching={isResearching}
+                          onQuestionChange={setResearchQuestion}
+                          onAnalyze={() => void sendResearch()}
+                          language={language}
+                        />
+                      </div>
+                    )}
+              
               
                     {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
@@ -1608,7 +1646,85 @@ function StudyDoor({
   );
 }
 
-      
+
+function ResearchDoor({
+  question,
+  result,
+  error,
+  isResearching,
+  onQuestionChange,
+  onAnalyze,
+  language,
+}: {
+  question: string;
+  result: LumenResearchResult | null;
+  error: string;
+  isResearching: boolean;
+  onQuestionChange: (value: string) => void;
+  onAnalyze: () => void;
+  language: LumenLanguage;
+}) {
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-research-door">
+      <div className="flex items-center gap-2 text-accent">
+        <Search className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your research</h2>
+      </div>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Ask anything and I research it on the web: a detailed answer with the evidence and the sources named, so you can check everything yourself.</p>
+
+      <textarea
+        value={question}
+        onChange={(event) => onQuestionChange(event.target.value)}
+        data-testid="input-research-question" dir="ltr"
+        placeholder="What do you want to research?"
+        maxLength={4000}
+        rows={3}
+        className="mt-5 w-full resize-y rounded-lg border border-border/90 bg-background/40 px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+      />
+
+      <button type="button" onClick={onAnalyze} disabled={!question.trim() || isResearching} data-testid="button-research-analyze" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        {isResearching ? (
+          <>
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+            Researching
+          </>
+        ) : (
+          <>
+            <Search className="h-4 w-4" strokeWidth={1.9} />
+            Research it
+          </>
+        )}
+      </button>
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-research-error">{error}</p>
+      )}
+
+      {result && (
+        <div className="mt-5 space-y-3" data-testid="container-research-result">
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">The answer</h3>
+            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-foreground" dir="auto">{result.answer}</p>
+          </div>
+          {result.sources.length > 0 && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Sources</h3>
+              <ul className="mt-1.5 space-y-1.5">
+                {result.sources.map((source, index) => (
+                  <li key={index} className="text-sm leading-6">
+                    <a href={source.uri} target="_blank" rel="noreferrer" className="text-primary underline decoration-primary/40 underline-offset-2 transition-colors hover:decoration-primary" dir="auto">{source.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+
 function AdvisorDoor({
   situation,
   result,
