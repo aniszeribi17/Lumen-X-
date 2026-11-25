@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
     Compass,
+    GraduationCap,
   CircleAlert,
   Clipboard,
   Eye,
@@ -33,11 +34,13 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, adviseMe,
+import { analyzeInput, chatFollowUp, adviseMe, solveStudy,
+        
          analyzeImage, checkShield, generalChat
        , supportChat, type
         
-        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenAdvisorRead,
+        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenAdvisorRead, type LumenStudyRead,
+        
         type LumenLanguage, type LumenShieldRead
         
         , type LumenMode } from './api';
@@ -145,6 +148,15 @@ function Home() {
   const [advisorResult, setAdvisorResult] = useState<LumenAdvisorRead | null>(null);
   const [advisorError, setAdvisorError] = useState('');
   const [isAdvising, setIsAdvising] = useState(false);
+    const [studyOpen, setStudyOpen] = useState(false);
+  const [studyProblem, setStudyProblem] = useState('');
+  const [studyImageData, setStudyImageData] = useState<string | null>(null);
+  const [studyImageName, setStudyImageName] = useState('');
+  const [studyResult, setStudyResult] = useState<LumenStudyRead | null>(null);
+  const [studyError, setStudyError] = useState('');
+  const [isSolving, setIsSolving] = useState(false);
+  const [isStudyImageProcessing, setIsStudyImageProcessing] = useState(false);
+  
   
   
   
@@ -559,6 +571,42 @@ function Home() {
     }
   };
   
+  const handleStudyFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setStudyError('That file is not an image. Try a PNG, JPG, or WEBP.');
+      return;
+    }
+    setIsStudyImageProcessing(true);
+    try {
+      const prepared = await prepareImageForAnalysis(file);
+      setStudyImageData(prepared);
+      setStudyImageName(file.name);
+      setStudyResult(null);
+      setStudyError('');
+    } catch {
+      setStudyError('That image could not be prepared. Try a JPG, PNG, or WEBP under 10 MB.');
+    } finally {
+      setIsStudyImageProcessing(false);
+    }
+  };
+
+  const sendStudy = async () => {
+    if ((!studyProblem.trim() && !studyImageData) || isSolving) return;
+    setIsSolving(true);
+    setStudyError('');
+    try {
+      const result = await solveStudy({ problem: studyProblem.trim(), imageData: studyImageData, language });
+      setStudyResult(result);
+    } catch (error) {
+      setStudyError(error instanceof Error && error.message ? error.message : 'Lumen could not solve that. Check your connection and try again.');
+    } finally {
+      setIsSolving(false);
+    }
+  };
+  
+  
   
   
   
@@ -739,7 +787,8 @@ function Home() {
                         </button>
                       )}
                       
-                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); }}
+                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); }}
+                                              
                                               
                                               
                                               data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
@@ -747,25 +796,34 @@ function Home() {
                         
                         <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Support</span>
-                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); }}
+                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); }}
+                                                       
                    data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Chat</span>
                       </button>
-                                                                                        <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); setShieldOpen(false); setAdvisorOpen(false); }}
+                                                                                        <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); }}
+                                                                                          
                                                                                           
                                               data-testid="button-image-composer" aria-pressed={imageDoorOpen} className={imageDoorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <ScanEye className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Image</span>
                       </button>
-                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setAdvisorOpen(false); }}
+                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setAdvisorOpen(false); setStudyOpen(false); }}
+                                              
                                               data-testid="button-shield-composer" aria-pressed={shieldOpen} className={shieldOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <ShieldAlert className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Shield</span>
                                                                     </button>
-                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-advisor-composer" aria-pressed={advisorOpen} className={advisorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setStudyOpen(false); }}
+                        data-testid="button-advisor-composer" aria-pressed={advisorOpen} className={advisorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <Compass className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Advisor</span>
+
+                                              </button>
+                      <button type="button" onClick={() => { setStudyOpen((open) => !open); setAdvisorOpen(false); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-study-composer" aria-pressed={studyOpen} className={studyOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                        <GraduationCap className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        <span className="hidden sm:inline">Your Study</span>
                         
                       </button>
                       
@@ -883,6 +941,24 @@ function Home() {
                     )}
               
 
+                                  {studyOpen && (
+                      <div className="mb-3">
+                        <StudyDoor
+                          problem={studyProblem}
+                          imageData={studyImageData}
+                          imageName={studyImageName}
+                          result={studyResult}
+                          error={studyError}
+                          isSolving={isSolving}
+                          isProcessing={isStudyImageProcessing}
+                          onProblemChange={setStudyProblem}
+                          onFileChange={handleStudyFileChange}
+                          onAnalyze={() => void sendStudy()}
+                          language={language}
+                        />
+                      </div>
+                    )}
+              
                     {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
                             {!isAnalyzing && view === 'result' && analysis && (
@@ -1404,6 +1480,130 @@ const SUPPORT_INTRO: Record<LumenLanguage, string> = {
   pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
 };
 
+function StudyDoor({
+  problem,
+  imageData,
+  imageName,
+  result,
+  error,
+  isSolving,
+  isProcessing,
+  onProblemChange,
+  onFileChange,
+  onAnalyze,
+  language,
+}: {
+  problem: string;
+  imageData: string | null;
+  imageName: string;
+  result: LumenStudyRead | null;
+  error: string;
+  isSolving: boolean;
+  isProcessing: boolean;
+  onProblemChange: (value: string) => void;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAnalyze: () => void;
+  language: LumenLanguage;
+}) {
+  const studyFileRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-study-door">
+      <div className="flex items-center gap-2 text-accent">
+        <GraduationCap className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your study</h2>
+      </div>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Write a mathematics or physics problem, or photograph it. I solve it step by step — formula, substitution, result — then verify my own answer.</p>
+
+      <textarea
+        value={problem}
+        onChange={(event) => onProblemChange(event.target.value)}
+        data-testid="input-study-problem" dir="ltr"
+        placeholder="Write your problem here..."
+        maxLength={20000}
+        rows={4}
+        className="mt-5 w-full resize-y rounded-lg border border-border/90 bg-background/40 px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+      />
+
+      <input ref={studyFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFileChange} className="hidden" data-testid="input-study-image-file" />
+      <button type="button" onClick={() => studyFileRef.current?.click()} disabled={isProcessing} data-testid="button-study-choose-image" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-60">
+        <ImagePlus className="h-4 w-4 text-accent" strokeWidth={1.7} />
+        {isProcessing ? 'Preparing...' : imageName ? imageName : 'Attach a photo of the problem (optional)'}
+      </button>
+
+      {imageData && (
+        <img src={imageData} alt="The problem you shared" className="mt-4 max-h-64 w-full rounded-xl border border-border/70 object-contain" data-testid="img-study-preview" />
+      )}
+
+      <button type="button" onClick={onAnalyze} disabled={(!problem.trim() && !imageData) || isSolving || isProcessing} data-testid="button-study-analyze" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        {isSolving ? (
+          <>
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+            Solving
+          </>
+        ) : (
+          <>
+            <GraduationCap className="h-4 w-4" strokeWidth={1.9} />
+            Solve it
+          </>
+        )}
+      </button>
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-study-error">{error}</p>
+      )}
+
+      {result && (
+        <div className="mt-5 space-y-3" data-testid="container-study-result">
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Subject</h3>
+            <p className="mt-1.5 text-sm font-medium leading-6 text-foreground" dir="auto">{result.subject}</p>
+          </div>
+          {result.givens.length > 0 && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">The givens</h3>
+              <ul className="mt-1.5 space-y-1.5">
+                {result.givens.map((given, index) => (
+                  <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">• {given}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">The steps</h3>
+            <ol className="mt-1.5 space-y-3">
+              {result.steps.map((step, index) => (
+                <li key={index} className="rounded-xl border border-border/70 bg-background/40 px-4 py-3.5">
+                  <p className="text-sm font-semibold leading-6 text-foreground" dir="auto">{index + 1}. {step.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-foreground" dir="auto">{step.work}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground" dir="auto">{step.why}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="rounded-xl border border-primary/25 bg-primary/[.06] px-4 py-3.5">
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">The final answer</h3>
+            <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground" dir="auto">{result.finalAnswer}</p>
+          </div>
+          {result.check && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">How I checked it</h3>
+              <p className="mt-1.5 text-sm leading-6 text-muted-foreground" dir="auto">{result.check}</p>
+            </div>
+          )}
+          {result.watchOut && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Watch out</h3>
+              <p className="mt-1.5 text-sm leading-6 text-muted-foreground" dir="auto">{result.watchOut}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+      
 function AdvisorDoor({
   situation,
   result,
