@@ -228,6 +228,43 @@ function isValidShieldRead(value) {
   );
 }
 
+function buildAdvisorSystemPrompt(languageLabel) {
+  return `You are Lumen, the assistant inside the Lumen X app, acting as the user's personal advisor. The user describes a situation or a decision they face. Your job: think clearly, take a position, and give them one decision they can act on — not a list of maybes.
+
+Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
+
+How you advise:
+- Read the situation exactly as described; work only with what the user gave you. Never invent facts about their life.
+- Weigh what matters most: their goal, their time, their money, their dignity, and the risk of each path.
+- Commit to ONE verdict. If a key fact is missing, state your assumption inside the reasoning instead of refusing to decide.
+- The action must be one concrete step they can take today, small enough to actually do.
+- If the situation involves another person, write the exact words they can send or say — ready to copy, in their voice, firm and respectful.
+- Be honest about the cost of doing nothing; waiting is also a decision.
+
+Answer with ONLY a JSON object in exactly this shape, with every text value strictly in ${languageLabel}:
+{
+  "verdict": "the decision, in one clear line",
+  "why": ["the reasons behind the decision, one per item, 2 to 4 items"],
+  "theAction": "the one concrete action to take now",
+  "exactWords": "the exact message or words to use with the other person, ready to copy; empty string if no other person is involved",
+  "avoid": ["what to avoid doing or saying, one per item, 1 to 4 items"],
+  "costOfWaiting": "what doing nothing will cost them"
+}`;
+}
+
+function isValidAdvisorRead(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.verdict === 'string' && value.verdict.length > 0 &&
+    Array.isArray(value.why) && value.why.length > 0 && value.why.every((item) => typeof item === 'string') &&
+    typeof value.theAction === 'string' && value.theAction.length > 0 &&
+    typeof value.exactWords === 'string' &&
+    Array.isArray(value.avoid) && value.avoid.length > 0 && value.avoid.every((item) => typeof item === 'string') &&
+    typeof value.costOfWaiting === 'string' && value.costOfWaiting.length > 0
+  );
+}
+
     function buildScamSystemPrompt(languageLabel) {
   return `You are Lumen, a thoughtful assistant that helps people check whether a message, offer, or request might be a scam or fraud.
 Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
@@ -963,6 +1000,96 @@ app.post('/api/lumen/image', async (req, res) => {
   } catch (error) {
     console.error('Lumen shield check failed:', error);
     return res.status(502).json({ error: "Lumen couldn't check that. Please try again." });
+  }
+});
+
+app.post('/api/lumen/advisor', async (req, res) => {
+  const body = req.body ?? {};
+  const situation = typeof body.situation === 'string' ? body.situation.trim() : '';
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  if (language === null || !situation || situation.length > 20000) {
+    return res.status(400).json({ error: 'Please describe your situation first.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildAdvisorSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `My situation:\n${situation}` }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini advisor request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't advise on that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const replyText = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!replyText) {
+      return res.status(500).json({ error: "Lumen couldn't find enough detail to advise on that yet." });
+    }
+
+    const result = JSON.parse(stripJsonFences(replyText));
+    if (!isValidAdvisorRead(result)) {
+      throw new Error('Gemini answer did not match the expected shape.');
+    }
+    return res.json({
+      verdict: result.verdict,
+      why: result.why,
+      theAction: result.theAction,
+      exactWords: result.exactWords,
+      avoid: result.avoid,
+      costOfWaiting: result.costOfWaiting,
+    });
+  } catch (error) {
+    console.error('Lumen advisor failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't advise on that. Please try again." });
   }
 });
 
