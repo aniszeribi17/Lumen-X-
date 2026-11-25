@@ -239,3 +239,38 @@ export async function checkShield(input: LumenShieldInput): Promise<LumenShieldR
   return body;
 }
 
+
+export interface LumenAdvisorRead {
+  verdict: string;
+  why: string[];
+  theAction: string;
+  exactWords: string;
+  avoid: string[];
+  costOfWaiting: string;
+}
+
+export interface LumenAdvisorInput {
+  situation: string;
+  language: LumenLanguage;
+}
+
+/** Decision advice for a situation: one verdict, one action, the exact words. */
+export async function adviseMe(input: LumenAdvisorInput): Promise<LumenAdvisorRead> {
+  const response = await fetchWithRetry('/api/lumen/advisor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not advise on that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as LumenAdvisorRead;
+  if (!body || typeof body.verdict !== 'string' || typeof body.theAction !== 'string') {
+    throw new Error('Lumen could not advise on that yet.');
+  }
+  return body;
+}
+
