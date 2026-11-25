@@ -316,3 +316,39 @@ export async function solveStudy(input: LumenStudyInput): Promise<LumenStudyRead
   }
   return body;
 }
+
+
+export interface LumenResearchSource {
+  title: string;
+  uri: string;
+}
+
+export interface LumenResearchResult {
+  answer: string;
+  sources: LumenResearchSource[];
+}
+
+export interface LumenResearchInput {
+  question: string;
+  language: LumenLanguage;
+}
+
+/** Researched answer with named sources: detailed, evidenced, web-backed. */
+export async function researchTopic(input: LumenResearchInput): Promise<LumenResearchResult> {
+  const response = await fetchWithRetry('/api/lumen/research', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not research that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as LumenResearchResult;
+  if (!body || typeof body.answer !== 'string' || !body.answer) {
+    throw new Error('Lumen could not research that yet.');
+  }
+  return { answer: body.answer, sources: Array.isArray(body.sources) ? body.sources : [] };
+}
