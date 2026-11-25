@@ -265,6 +265,45 @@ function isValidAdvisorRead(value) {
   );
 }
 
+function buildStudySystemPrompt(languageLabel) {
+  return `You are Lumen, the assistant inside the Lumen X app, acting as the user's study teacher for mathematics and physics. The user gives you a problem, typed or in a photo. Your job: solve it completely and teach the method, so the user can solve the next one alone.
+
+Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
+
+How you solve:
+- First extract the givens exactly as stated: every value, symbol and unit. Never invent a value that is not in the problem; if a value is missing, say which one and solve with what is given.
+- Work in numbered steps. Each step has a short title, the work itself (the formula first, then the numbers substituted, then the result), and one line explaining why this step is done.
+- Show formulas in plain readable text, for example: v = d / t, then v = 120 / 2 = 60 km/h.
+- The final answer carries its unit, always.
+- Then verify your own answer: substitute it back, estimate the size, or check the units — and say plainly what you checked.
+- End with the most common mistake students make on this exact kind of problem, so the user can avoid it.
+- If the problem is not mathematics or physics, still solve what you can the same way and name its subject honestly.
+
+Answer with ONLY a JSON object in exactly this shape, with every text value strictly in ${languageLabel}:
+{
+  "subject": "Mathematics or Physics, and the topic in a few words",
+  "givens": ["each given value with its symbol and unit, one per item"],
+  "steps": [{"title": "the step in a few words", "work": "the formula, the substitution, and the result", "why": "why this step is done"}],
+  "finalAnswer": "the final answer with its unit",
+  "check": "how you verified the answer",
+  "watchOut": "the most common mistake on this kind of problem"
+}`;
+}
+
+function isValidStudyRead(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.subject === 'string' && value.subject.length > 0 &&
+    Array.isArray(value.givens) && value.givens.every((item) => typeof item === 'string') &&
+    Array.isArray(value.steps) && value.steps.length > 0 &&
+    value.steps.every((step) => step !== null && typeof step === 'object' && typeof step.title === 'string' && typeof step.work === 'string' && typeof step.why === 'string') &&
+    typeof value.finalAnswer === 'string' && value.finalAnswer.length > 0 &&
+    typeof value.check === 'string' &&
+    typeof value.watchOut === 'string'
+  );
+}
+
     function buildScamSystemPrompt(languageLabel) {
   return `You are Lumen, a thoughtful assistant that helps people check whether a message, offer, or request might be a scam or fraud.
 Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
@@ -1093,6 +1132,110 @@ app.post('/api/lumen/advisor', async (req, res) => {
   }
 });
 
+app.post('/api/lumen/study', async (req, res) => {
+  const body = req.body ?? {};
+  const problem = typeof body.problem === 'string' ? body.problem.trim() : '';
+  const imageData =
+    typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  if (language === null || (!problem && !imageData) || problem.length > 20000) {
+    return res.status(400).json({ error: 'Please write or photograph your problem first.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  const parts = [
+    {
+      text: problem
+        ? `Solve this problem:\n${problem}`
+        : 'Solve the problem in this photo.',
+    },
+  ];
+
+  if (imageData) {
+    try {
+      parts.push({ inlineData: parseImageData(imageData) });
+    } catch (error) {
+      console.warn('Invalid image data received:', error);
+      return res.status(400).json({ error: 'That image could not be read. Try uploading it again.' });
+    }
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildStudySystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents: [{ role: 'user', parts }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini study request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't solve that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const replyText = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!replyText) {
+      return res.status(500).json({ error: "Lumen couldn't read that problem yet." });
+    }
+
+    const result = JSON.parse(stripJsonFences(replyText));
+    if (!isValidStudyRead(result)) {
+      throw new Error('Gemini answer did not match the expected shape.');
+    }
+    return res.json({
+      subject: result.subject,
+      givens: result.givens,
+      steps: result.steps,
+      finalAnswer: result.finalAnswer,
+      check: result.check,
+      watchOut: result.watchOut,
+    });
+  } catch (error) {
+    console.error('Lumen study failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't solve that. Please try again." });
+  }
+});
+      
       // Unknown API routes get a JSON 404, not the web page.
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
