@@ -166,3 +166,38 @@ export async function generalChat(input: LumenGeneralInput): Promise<string> {
   }
   return body.reply;
 }
+
+export interface LumenImageRead {
+  whatItIs: string;
+  details: string[];
+  verdict: string;
+  whatToDo: string[];
+  howToHandle: string;
+}
+
+export interface LumenImageInput {
+  imageData: string;
+  question: string;
+  language: LumenLanguage;
+}
+
+/** A dedicated read of one image: what it is, the verdict, what to do, how to handle it. */
+export async function analyzeImage(input: LumenImageInput): Promise<LumenImageRead> {
+  const response = await fetchWithRetry('/api/lumen/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not read that image. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as LumenImageRead;
+  if (!body || typeof body.whatItIs !== 'string' || typeof body.verdict !== 'string') {
+    throw new Error('Lumen could not read that image yet.');
+  }
+  return body;
+}
+
