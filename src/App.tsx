@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
+  Copy,
   CircleAlert,
   Clipboard,
   Eye,
@@ -13,6 +14,7 @@ import {
   Lightbulb,
     Mic,
   MessageSquareText,
+  MoreHorizontal,
   Paperclip,
   RefreshCw,
   ScanEye,
@@ -24,6 +26,8 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  ThumbsDown,
+  ThumbsUp,
     Volume2,
   VolumeX,
     ScrollText,
@@ -100,6 +104,8 @@ function Home() {
   const [chatError, setChatError] = useState('');
   const [isChatting, setIsChatting] = useState(false);
     const [supportOpen, setSupportOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [supportMessages, setSupportMessages] = useState<LumenChatMessage[]>([]);
   const [supportInput, setSupportInput] = useState('');
   const [supportError, setSupportError] = useState('');
@@ -481,10 +487,6 @@ function Home() {
 
                 </select>
               </label>
-                            <button type="button" onClick={() => setSupportOpen((open) => !open)} data-testid="button-support-toggle" aria-pressed={supportOpen} className="flex items-center gap-2 rounded-lg border border-border/90 bg-card/50 px-2.5 py-2 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
-                <Heart className="h-3.5 w-3.5 text-accent" strokeWidth={1.7} />
-                <span className="hidden sm:inline">Support</span>
-              </button>
               
             </div>
           </header>
@@ -526,9 +528,10 @@ function Home() {
                     <div className="flex items-center gap-2 text-[9px] uppercase tracking-[.12em] text-muted-foreground">
                       <Sparkles className="h-3.5 w-3.5 text-primary" strokeWidth={1.6} />
                       <span className="hidden sm:inline">Lumen engine</span>
+                      <span className="font-mono-label text-[9px] tracking-[.05em] text-muted-foreground/60">{prompt.length.toLocaleString()} / 50,000</span>
                     </div>
                   </div>
-                                    <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Reading mode">
+                                    <div className="mt-4 flex flex-nowrap gap-1.5" role="group" aria-label="Reading mode">
                     {(
                       [
                         { value: 'read', label: 'Read' },
@@ -544,8 +547,8 @@ function Home() {
                         aria-pressed={mode === option.value}
                         className={
                           mode === option.value
-                            ? 'rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground transition-colors'
-                            : 'rounded-lg border border-border/90 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
+                            ? 'rounded-lg bg-primary px-2.5 py-1.5 text-[10.5px] font-bold text-primary-foreground transition-colors'
+                            : 'rounded-lg border border-border/90 px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
                         }
                       >
                         {option.label}
@@ -558,7 +561,7 @@ function Home() {
                     value={prompt}
                     onChange={(event) => setPrompt(event.target.value)}
                     data-testid="input-lumen-prompt"
-                    placeholder="Paste the message. Describe what feels off. Ask what to do next."
+                    placeholder="Paste the unclear thing here."
                     className="mt-5 min-h-[160px] w-full resize-none bg-transparent text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/55 sm:min-h-[190px] sm:text-[16px]"
                     maxLength={50000}
                   />
@@ -574,7 +577,7 @@ function Home() {
                       </button>
                     </div>
                   )}
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/70 pt-3">
                     <div className="flex items-center gap-2">
                       <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFileChange} className="hidden" data-testid="input-image-file" />
                       <button type="button" onClick={() => fileInputRef.current?.click()} data-testid="button-attach-image" className="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -588,11 +591,14 @@ function Home() {
                         </button>
                       )}
                       
-                      <span className="font-mono-label text-[9px] tracking-[.05em] text-muted-foreground/60">{prompt.length.toLocaleString()} / 50,000</span>
-                                    
+                      <button type="button" onClick={() => setSupportOpen((open) => !open)} data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                        <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        <span className="hidden sm:inline">Support</span>
+                      </button>
+
                       
                     </div>
-                    <button type="submit" disabled={isAnalyzing || isImageProcessing} data-testid="button-analyze" className="group flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground shadow-[0_10px_25px_-15px_hsl(73_100%_62%/.8)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-wait disabled:opacity-65">
+                    <button type="submit" disabled={isAnalyzing || isImageProcessing} data-testid="button-analyze" className="group flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground shadow-[0_10px_25px_-15px_hsl(73_100%_62%/.8)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-wait disabled:opacity-65">
                       {isImageProcessing ? (
                         <>
                           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
@@ -641,6 +647,106 @@ function Home() {
                             {!isAnalyzing && view === 'result' && analysis && (
                 <div className="space-y-3">
                   <AnalysisResult analysis={analysis} language={analysisLanguage} copied={copied} onCopy={copyReply} />
+                  <div className="relative flex items-center gap-1 px-1" data-testid="container-answer-actions">
+                    <button type="button" onClick={() => void copyReply()} data-testid="button-action-copy" aria-label="Copy reply" className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {copied ? <Check className="h-4 w-4 text-accent" strokeWidth={2.2} /> : <Copy className="h-4 w-4" strokeWidth={1.8} />}
+                    </button>
+                    <button type="button" onClick={() => setFeedback((current) => (current === 'up' ? null : 'up'))} data-testid="button-action-like" aria-label="Good answer" aria-pressed={feedback === 'up'} className={feedback === 'up' ? 'grid h-8 w-8 place-items-center rounded-lg bg-secondary text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : 'grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                      <ThumbsUp className="h-4 w-4" strokeWidth={1.8} />
+                    </button>
+                    <button type="button" onClick={() => setFeedback((current) => (current === 'down' ? null : 'down'))} data-testid="button-action-dislike" aria-label="Bad answer" aria-pressed={feedback === 'down'} className={feedback === 'down' ? 'grid h-8 w-8 place-items-center rounded-lg bg-secondary text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : 'grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                      <ThumbsDown className="h-4 w-4" strokeWidth={1.8} />
+                    </button>
+                    <button type="button" onClick={speakAnalysis} data-testid="button-action-listen" aria-label={isSpeaking ? 'Stop' : 'Listen'} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {isSpeaking ? <VolumeX className="h-4 w-4" strokeWidth={1.8} /> : <Volume2 className="h-4 w-4" strokeWidth={1.8} />}
+                    </button>
+                    <button type="button" onClick={() => void shareAnalysis()} data-testid="button-action-share" aria-label="Share this read" className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {shareCopied ? <Check className="h-4 w-4 text-accent" strokeWidth={2.2} /> : <Share2 className="h-4 w-4" strokeWidth={1.8} />}
+                    </button>
+                    <button type="button" onClick={() => setMenuOpen((open) => !open)} data-testid="button-results-menu" aria-haspopup="menu" aria-expanded={menuOpen} aria-label="More actions" className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <MoreHorizontal className="h-4 w-4" strokeWidth={1.8} />
+                    </button>
+                    {menuOpen && (
+                      <>
+                        <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setMenuOpen(false)} className="fixed inset-0 z-10 cursor-default" />
+                        <div className="absolute bottom-full right-0 z-20 mb-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-border bg-card p-2 shadow-2xl" role="menu">
+                          <button type="button" role="menuitem" onClick={() => { setSupportOpen((open) => !open); setMenuOpen(false); }} data-testid="button-support-toggle" aria-pressed={supportOpen} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <Heart className="h-4 w-4 shrink-0 text-accent" strokeWidth={1.7} />
+                            Support
+                          </button>
+                          {view === 'result' && analysis && (
+                            <>
+                              <div className="my-1.5 h-px bg-border/70" />
+                              <div className="flex items-center gap-1.5 px-1.5 py-1">
+                                <button type="button" role="menuitem" onClick={() => { speakAnalysis(); setMenuOpen(false); }} data-testid="button-listen" className="inline-flex flex-1 items-center gap-2 rounded-lg bg-foreground px-3 py-2 text-[11px] font-bold text-background transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                  {isSpeaking ? <VolumeX className="h-3.5 w-3.5" strokeWidth={1.8} /> : <Volume2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                                  {isSpeaking ? 'Stop' : 'Listen'}
+                                </button>
+                                {(
+                                  [
+                                    { value: 'female', label: 'Female voice' },
+                                    { value: 'male', label: 'Male voice' },
+                                  ] as { value: 'female' | 'male'; label: string }[]
+                                ).map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setVoiceKind(option.value)}
+                                    data-testid={`button-voice-${option.value}`}
+                                    aria-pressed={voiceKind === option.value}
+                                    className={
+                                      voiceKind === option.value
+                                        ? 'rounded-lg bg-primary px-2.5 py-2 text-[10px] font-bold text-primary-foreground transition-colors'
+                                        : 'rounded-lg border border-border/90 px-2.5 py-2 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
+                                    }
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <button type="button" role="menuitem" onClick={() => { void shareAnalysis(); setMenuOpen(false); }} data-testid="button-share-analysis" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {shareCopied ? <Check className="h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} /> : <Share2 className="h-4 w-4 shrink-0 text-accent" strokeWidth={1.8} />}
+                                {shareCopied ? 'Copied to clipboard' : 'Share this read'}
+                              </button>
+                              <button type="button" role="menuitem" disabled={isDeepening || !lastInput} onClick={() => { setMenuOpen(false); void explainDeep(); }} data-testid="button-deep" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                                <ScrollText className="h-4 w-4 shrink-0 text-accent" strokeWidth={1.8} />
+                                {isDeepening ? 'Preparing...' : 'Detailed explanation'}
+                              </button>
+                              {analysis.reply && (
+                                <>
+                                  <div className="my-1.5 h-px bg-border/70" />
+                                  <p className="flex items-center gap-2 px-3 pb-1 pt-1.5 font-mono-label text-[9px] uppercase tracking-[.18em] text-muted-foreground">
+                                    <RefreshCw className="h-3.5 w-3.5 text-accent" strokeWidth={1.7} />
+                                    Reply in another tone
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5 px-1.5 pb-1.5">
+                                    {[
+                                      { label: 'Warmer', instruction: 'warmer and friendlier' },
+                                      { label: 'Firmer', instruction: 'firmer and more direct' },
+                                      { label: 'Shorter', instruction: 'much shorter and to the point' },
+                                      { label: 'Formal', instruction: 'formal and professional' },
+                                    ].map((tone) => (
+                                      <button
+                                        key={tone.label}
+                                        type="button"
+                                        disabled={isRewriting}
+                                        onClick={() => { setMenuOpen(false); void rewriteReply(tone.instruction); }}
+                                        data-testid={`button-tone-${tone.label.toLowerCase()}`}
+                                        className="rounded-lg border border-border/90 px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
+                                      >
+                                        {tone.label}
+                                      </button>
+                                    ))}
+                                    {isRewriting && <span className="flex items-center text-[11px] text-muted-foreground">Rewriting...</span>}
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <FollowUpChat
                     messages={chatMessages}
                     input={chatInput}
@@ -650,81 +756,17 @@ function Home() {
                     error={chatError}
                     language={analysisLanguage}
                   />
-                                    <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-reply-tools">
-                    <div className="flex items-center gap-2 text-accent">
-                      <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
-                      <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Reply in another tone</h2>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {[
-                        { label: 'Warmer', instruction: 'warmer and friendlier' },
-                        { label: 'Firmer', instruction: 'firmer and more direct' },
-                        { label: 'Shorter', instruction: 'much shorter and to the point' },
-                        { label: 'Formal', instruction: 'formal and professional' },
-                      ].map((tone) => (
-                        <button
-                          key={tone.label}
-                          type="button"
-                          disabled={isRewriting}
-                          onClick={() => void rewriteReply(tone.instruction)}
-                          data-testid={`button-tone-${tone.label.toLowerCase()}`}
-                          className="rounded-lg border border-border/90 px-3 py-2 text-[11px] font-semibold text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary active:translate-y-0 disabled:cursor-wait disabled:opacity-60"
-                        >
-                          {tone.label}
-                        </button>
-                      ))}
-                      {isRewriting && <span className="flex items-center text-[11px] text-muted-foreground">Rewriting...</span>}
-                    </div>
-                                                          <button type="button" onClick={() => void shareAnalysis()} data-testid="button-share-analysis" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      {shareCopied ? <Check className="h-3.5 w-3.5" strokeWidth={2.2} /> : <Share2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                      {shareCopied ? 'Copied to clipboard' : 'Share this read'}
-                    </button>
-                                            <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-voice">
-                    <div className="flex items-center gap-2 text-accent">
-                      <Volume2 className="h-4 w-4" strokeWidth={1.7} />
-                      <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Listen to this read</h2>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button type="button" onClick={speakAnalysis} data-testid="button-listen" className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        {isSpeaking ? <VolumeX className="h-3.5 w-3.5" strokeWidth={1.8} /> : <Volume2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                        {isSpeaking ? 'Stop' : 'Listen'}
-                      </button>
-                      {(
-                        [
-                          { value: 'female', label: 'Female voice' },
-                          { value: 'male', label: 'Male voice' },
-                        ] as { value: 'female' | 'male'; label: string }[]
-                      ).map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setVoiceKind(option.value)}
-                          data-testid={`button-voice-${option.value}`}
-                          aria-pressed={voiceKind === option.value}
-                          className={
-                            voiceKind === option.value
-                              ? 'rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground transition-colors'
-                              : 'rounded-lg border border-border/90 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
-                          }
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                                           <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-deep">
+                                    {(deepResult || isDeepening) && (
+                    <div className="luminous-panel rounded-[18px] p-5 sm:p-6" data-testid="container-deep">
                     <div className="flex items-center gap-2 text-accent">
                       <ScrollText className="h-4 w-4" strokeWidth={1.7} />
                       <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Detailed explanation</h2>
                     </div>
-                    {!deepResult && (
-                      <>
-                        <p className="mt-2 text-xs leading-5 text-muted-foreground">Every part of the message, point by point, with the exact words from it as evidence.</p>
-                        <button type="button" onClick={() => void explainDeep()} disabled={isDeepening} data-testid="button-deep" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-all hover:-translate-y-0.5 hover:bg-foreground/90 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          <ScrollText className="h-3.5 w-3.5" strokeWidth={1.8} />
-                          {isDeepening ? 'Preparing...' : 'Explain in detail'}
-                        </button>
-                      </>
+                    {isDeepening && !deepResult && (
+                      <p className="mt-4 flex items-center gap-2.5 text-sm text-muted-foreground" aria-live="polite">
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                        Preparing...
+                      </p>
                     )}
                     {deepResult && (
                       <div className="mt-4 space-y-5">
@@ -779,8 +821,7 @@ function Home() {
                       </div>
                     )}
                   </div>
-                                      
-                  </div>
+                  )}
                  
                 </div>
               )}
@@ -1063,9 +1104,9 @@ function FollowUpChat({
     <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
       <div className="flex items-center gap-2 text-accent">
         <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
-        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Keep asking</h2>
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Follow-up</h2>
       </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">Ask a follow-up about this read — Lumen remembers the message and the analysis.</p>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Ask a follow-up about this read — Lumen remembers the message and the analysis.</p>
 
       {messages.length > 0 && (
         <div className="mt-5 space-y-2.5" data-testid="list-chat-messages">
@@ -1081,7 +1122,7 @@ function FollowUpChat({
               <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
                 {message.role === 'user' ? 'You' : 'Lumen'}
               </span>
-              <span className="whitespace-pre-wrap">{message.text}</span>
+              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
             </div>
           ))}
           {isSending && (
@@ -1102,7 +1143,7 @@ function FollowUpChat({
           type="text"
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
-          data-testid="input-chat-message"
+          data-testid="input-chat-message" dir="ltr"
           placeholder="Ask a follow-up..."
           maxLength={4000}
           className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
@@ -1166,7 +1207,7 @@ function SupportChat({
               <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
                 {message.role === 'user' ? 'You' : 'Lumen'}
               </span>
-              <span className="whitespace-pre-wrap">{message.text}</span>
+              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
             </div>
           ))}
           {isSending && (
@@ -1187,7 +1228,7 @@ function SupportChat({
           type="text"
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
-          data-testid="input-support-message"
+          data-testid="input-support-message" dir="ltr"
           placeholder="Say what is on your mind..."
           maxLength={4000}
           className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
