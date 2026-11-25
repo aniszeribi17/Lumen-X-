@@ -274,3 +274,45 @@ export async function adviseMe(input: LumenAdvisorInput): Promise<LumenAdvisorRe
   return body;
 }
 
+
+
+export interface LumenStudyStep {
+  title: string;
+  work: string;
+  why: string;
+}
+
+export interface LumenStudyRead {
+  subject: string;
+  givens: string[];
+  steps: LumenStudyStep[];
+  finalAnswer: string;
+  check: string;
+  watchOut: string;
+}
+
+export interface LumenStudyInput {
+  problem: string;
+  imageData?: string | null;
+  language: LumenLanguage;
+}
+
+/** Step-by-step mathematics and physics solving: givens, steps, verified answer. */
+export async function solveStudy(input: LumenStudyInput): Promise<LumenStudyRead> {
+  const response = await fetchWithRetry('/api/lumen/study', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not solve that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as LumenStudyRead;
+  if (!body || typeof body.finalAnswer !== 'string' || !Array.isArray(body.steps)) {
+    throw new Error('Lumen could not solve that yet.');
+  }
+  return body;
+}
