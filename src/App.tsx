@@ -840,7 +840,8 @@ function Home() {
                         <ShieldAlert className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Shield</span>
                                                                     </button>
-                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setStudyOpen(false); }}setStudyOpen(false); setResearchOpen(false); }}
+                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setStudyOpen(false); setResearchOpen(false); }}
+                        
                       
                         data-testid="button-advisor-composer" aria-pressed={advisorOpen} className={advisorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <Compass className="h-4 w-4 text-accent" strokeWidth={1.7} />
