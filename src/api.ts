@@ -141,3 +141,28 @@ export async function supportChat(input: LumenSupportInput): Promise<string> {
   return body.reply;
 }
 
+
+export interface LumenGeneralInput {
+  messages: LumenChatMessage[];
+  language: LumenLanguage;
+}
+
+/** A general conversation with Lumen — ask anything. */
+export async function generalChat(input: LumenGeneralInput): Promise<string> {
+  const response = await fetchWithRetry('/api/lumen/general-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not answer that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as { reply?: string };
+  if (!body.reply) {
+    throw new Error('Lumen could not answer that yet.');
+  }
+  return body.reply;
+}
