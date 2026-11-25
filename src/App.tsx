@@ -621,7 +621,8 @@ function Home() {
                         </button>
                       )}
                       
-                      <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); }}
+                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); }} data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                                              
                         
                         <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Support</span>
