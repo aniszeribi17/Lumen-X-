@@ -32,7 +32,8 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, supportChat, type LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
+import { analyzeInput, chatFollowUp, generalChat, supportChat, type
+        LumenAnalysis, type LumenChatMessage, type LumenLanguage, type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
 
 // Lumen X — one page: paste something unclear, get a clear read.
@@ -110,6 +111,13 @@ function Home() {
   const [supportInput, setSupportInput] = useState('');
   const [supportError, setSupportError] = useState('');
   const [isSupporting, setIsSupporting] = useState(false);
+    const [talkOpen, setTalkOpen] = useState(false);
+  const [talkMessages, setTalkMessages] = useState<LumenChatMessage[]>([]);
+  const [talkInput, setTalkInput] = useState('');
+  const [talkError, setTalkError] = useState('');
+  const [isTalking, setIsTalking] = useState(false);
+  const talkRequestIdRef = useRef(0);
+      
   const chatRequestIdRef = useRef(0);
     const supportRequestIdRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -414,6 +422,28 @@ function Home() {
       if (supportRequestId === supportRequestIdRef.current) setIsSupporting(false);
     }
   };
+  
+  const sendTalk = async () => {
+    const text = talkInput.trim();
+    if (!text || isTalking) return;
+    const nextMessages: LumenChatMessage[] = [...talkMessages, { role: 'user', text }];
+    setTalkMessages(nextMessages);
+    setTalkInput('');
+    setTalkError('');
+    setIsTalking(true);
+    const talkRequestId = ++talkRequestIdRef.current;
+    try {
+      const reply = await generalChat({ messages: nextMessages, language });
+      if (talkRequestId !== talkRequestIdRef.current) return;
+      setTalkMessages([...nextMessages, { role: 'assistant', text: reply }]);
+    } catch (error) {
+      if (talkRequestId !== talkRequestIdRef.current) return;
+      setTalkError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+    } finally {
+      if (talkRequestId === talkRequestIdRef.current) setIsTalking(false);
+    }
+  };
+  
                                               
   const resetWorkspace = () => {
     requestIdRef.current += 1; // ignore any answer still on its way
@@ -591,10 +621,15 @@ function Home() {
                         </button>
                       )}
                       
-                      <button type="button" onClick={() => setSupportOpen((open) => !open)} data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                      <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); }}
+                        
                         <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Support</span>
+                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); }} data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                        <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        <span className="hidden sm:inline">Your Chat</span>
                       </button>
+                      
 
                       
                     </div>
@@ -642,6 +677,20 @@ function Home() {
                 </div>
               )}
               
+                          {talkOpen && (
+                <div className="mb-3">
+                  <GeneralChat
+                    messages={talkMessages}
+                    input={talkInput}
+                    onInputChange={setTalkInput}
+                    onSend={() => void sendTalk()}
+                    isSending={isTalking}
+                    error={talkError}
+                    language={language}
+                  />
+                </div>
+              )}
+
               {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
                             {!isAnalyzing && view === 'result' && analysis && (
