@@ -201,3 +201,40 @@ export async function analyzeImage(input: LumenImageInput): Promise<LumenImageRe
   return body;
 }
 
+
+export interface LumenShieldRead {
+  verdict: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  kind: string;
+  signals: string[];
+  evidence: string[];
+  whatToDo: string[];
+  howToHandle: string;
+}
+
+export interface LumenShieldInput {
+  text: string;
+  imageData: string | null;
+  language: LumenLanguage;
+}
+
+/** Scam, fraud and manipulation check for a message, an offer, an account, or a screenshot. */
+export async function checkShield(input: LumenShieldInput): Promise<LumenShieldRead> {
+  const response = await fetchWithRetry('/api/lumen/shield', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error || 'Lumen could not check that. Check your connection and try again.');
+  }
+
+  const body = (await response.json()) as LumenShieldRead;
+  if (!body || typeof body.verdict !== 'string' || typeof body.riskLevel !== 'string') {
+    throw new Error('Lumen could not check that yet.');
+  }
+  return body;
+}
+
