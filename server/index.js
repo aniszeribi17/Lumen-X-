@@ -823,6 +823,111 @@ app.post('/api/lumen/image', async (req, res) => {
   }
 });
 
+    app.post('/api/lumen/shield', async (req, res) => {
+  const body = req.body ?? {};
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+  const imageData =
+    typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  if (language === null || (!text && !imageData) || text.length > 20000) {
+    return res.status(400).json({ error: 'Please add a message or an image to check.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  const parts = [
+    {
+      text: text
+        ? `The user shares this and asks whether it is a scam, fraud, or manipulation:\n${text}`
+        : 'The user shared this image and asks whether it is a scam, fraud, or manipulation.',
+    },
+  ];
+
+  if (imageData) {
+    try {
+      parts.push({ inlineData: parseImageData(imageData) });
+    } catch (error) {
+      console.warn('Invalid image data received:', error);
+      return res.status(400).json({ error: 'That image could not be read. Try uploading it again.' });
+    }
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildShieldSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents: [{ role: 'user', parts }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini shield request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't check that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const replyText = responseBody.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!replyText) {
+      return res.status(500).json({ error: "Lumen couldn't find enough detail to check that yet." });
+    }
+
+    const result = JSON.parse(stripJsonFences(replyText));
+    if (!isValidShieldRead(result)) {
+      throw new Error('Gemini answer did not match the expected shape.');
+    }
+    return res.json({
+      verdict: result.verdict,
+      riskLevel: result.riskLevel,
+      kind: result.kind,
+      signals: result.signals,
+      evidence: result.evidence,
+      whatToDo: result.whatToDo,
+      howToHandle: result.howToHandle,
+    });
+  } catch (error) {
+    console.error('Lumen shield check failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't check that. Please try again." });
+  }
+});
+
       // Unknown API routes get a JSON 404, not the web page.
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
