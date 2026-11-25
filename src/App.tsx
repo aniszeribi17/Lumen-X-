@@ -32,9 +32,11 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, analyzeImage, generalChat, supportChat, type
+import { analyzeInput, chatFollowUp, analyzeImage, checkShield, generalChat
+       , supportChat, type
         
-        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenLanguage
+        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenLanguage, type LumenShieldRead
+        
         , type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
 
@@ -127,6 +129,15 @@ function Home() {
   const [doorError, setDoorError] = useState('');
   const [isDoorReading, setIsDoorReading] = useState(false);
   const [isDoorImageProcessing, setIsDoorImageProcessing] = useState(false);
+    const [shieldOpen, setShieldOpen] = useState(false);
+  const [shieldText, setShieldText] = useState('');
+  const [shieldImageData, setShieldImageData] = useState<string | null>(null);
+  const [shieldImageName, setShieldImageName] = useState('');
+  const [shieldResult, setShieldResult] = useState<LumenShieldRead | null>(null);
+  const [shieldError, setShieldError] = useState('');
+  const [isShieldReading, setIsShieldReading] = useState(false);
+  const [isShieldImageProcessing, setIsShieldImageProcessing] = useState(false);
+  
   
       
   const chatRequestIdRef = useRef(0);
@@ -490,6 +501,42 @@ function Home() {
     }
   };
   
+  const handleShieldFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setShieldError('That file is not an image. Try a PNG, JPG, or WEBP.');
+      return;
+    }
+    setIsShieldImageProcessing(true);
+    try {
+      const prepared = await prepareImageForAnalysis(file);
+      setShieldImageData(prepared);
+      setShieldImageName(file.name);
+      setShieldResult(null);
+      setShieldError('');
+    } catch {
+      setShieldError('That image could not be prepared. Try a JPG, PNG, or WEBP under 10 MB.');
+    } finally {
+      setIsShieldImageProcessing(false);
+    }
+  };
+
+  const sendShield = async () => {
+    if ((!shieldText.trim() && !shieldImageData) || isShieldReading) return;
+    setIsShieldReading(true);
+    setShieldError('');
+    try {
+      const result = await checkShield({ text: shieldText.trim(), imageData: shieldImageData, language });
+      setShieldResult(result);
+    } catch (error) {
+      setShieldError(error instanceof Error && error.message ? error.message : 'Lumen could not check that. Check your connection and try again.');
+    } finally {
+      setIsShieldReading(false);
+    }
+  };
+  
+  
   
                                               
   const resetWorkspace = () => {
@@ -668,21 +715,29 @@ function Home() {
                         </button>
                       )}
                       
-                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); }}
+                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); }}
+                                              
                                               data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                                               
                         
                         <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Support</span>
-                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); }}
+                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); }}
+                                                       
                                                        data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Chat</span>
                       </button>
-                                            <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-image-composer" aria-pressed={imageDoorOpen} className={imageDoorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                                            <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); setShieldOpen(false); }}
+                                              data-testid="button-image-composer" aria-pressed={imageDoorOpen} className={imageDoorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <ScanEye className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Image</span>
                       </button>
+                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-shield-composer" aria-pressed={shieldOpen} className={shieldOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                        <ShieldAlert className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        <span className="hidden sm:inline">Your Shield</span>
+                      </button>
+                      
                       
                       
 
@@ -759,6 +814,24 @@ function Home() {
                     onFileChange={handleDoorFileChange}
                     onQuestionChange={setDoorQuestion}
                     onAnalyze={() => void sendDoorImage()}
+                    language={language}
+                  />
+                </div>
+              )}
+
+                                 {shieldOpen && (
+                <div className="mb-3">
+                  <ShieldDoor
+                    text={shieldText}
+                    imageData={shieldImageData}
+                    imageName={shieldImageName}
+                    result={shieldResult}
+                    error={shieldError}
+                    isReading={isShieldReading}
+                    isProcessing={isShieldImageProcessing}
+                    onTextChange={setShieldText}
+                    onFileChange={handleShieldFileChange}
+                    onAnalyze={() => void sendShield()}
                     language={language}
                   />
                 </div>
@@ -1285,7 +1358,136 @@ const SUPPORT_INTRO: Record<LumenLanguage, string> = {
   pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
 };
 
-function ImageDoor({
+function ShieldDoor({
+  text,
+  imageData,
+  imageName,
+  result,
+  error,
+  isReading,
+  isProcessing,
+  onTextChange,
+  onFileChange,
+  onAnalyze,
+  language,
+}: {
+  text: string;
+  imageData: string | null;
+  imageName: string;
+  result: LumenShieldRead | null;
+  error: string;
+  isReading: boolean;
+  isProcessing: boolean;
+  onTextChange: (value: string) => void;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAnalyze: () => void;
+  language: LumenLanguage;
+}) {
+  const shieldFileRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-shield-door">
+      <div className="flex items-center gap-2 text-accent">
+        <ShieldAlert className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your shield</h2>
+      </div>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Paste any message, offer, or account — or attach a screenshot — and I check it for scam, fraud, and manipulation before you act.</p>
+
+      <textarea
+        value={text}
+        onChange={(event) => onTextChange(event.target.value)}
+        data-testid="input-shield-text" dir="ltr"
+        placeholder="Paste the message, offer, or account details here..."
+        maxLength={20000}
+        rows={4}
+        className="mt-5 w-full resize-y rounded-lg border border-border/90 bg-background/40 px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+      />
+
+      <input ref={shieldFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFileChange} className="hidden" data-testid="input-shield-image-file" />
+      <button type="button" onClick={() => shieldFileRef.current?.click()} disabled={isProcessing} data-testid="button-shield-choose-image" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-60">
+        <ImagePlus className="h-4 w-4 text-accent" strokeWidth={1.7} />
+        {isProcessing ? 'Preparing...' : imageName ? imageName : 'Attach a screenshot (optional)'}
+      </button>
+
+      {imageData && (
+        <img src={imageData} alt="The screenshot you shared" className="mt-4 max-h-64 w-full rounded-xl border border-border/70 object-contain" data-testid="img-shield-preview" />
+      )}
+
+      <button type="button" onClick={onAnalyze} disabled={(!text.trim() && !imageData) || isReading || isProcessing} data-testid="button-shield-analyze" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        {isReading ? (
+          <>
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+            Checking
+          </>
+        ) : (
+          <>
+            <ShieldAlert className="h-4 w-4" strokeWidth={1.9} />
+            Check this
+          </>
+        )}
+      </button>
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-shield-error">{error}</p>
+      )}
+
+      {result && (
+        <div className="mt-5 space-y-3" data-testid="container-shield-result">
+          <div
+            className={
+              result.riskLevel === 'high'
+                ? 'rounded-xl border border-destructive/40 bg-destructive/[.08] px-4 py-3.5'
+                : result.riskLevel === 'medium'
+                  ? 'rounded-xl border border-accent/40 bg-accent/[.08] px-4 py-3.5'
+                  : 'rounded-xl border border-primary/30 bg-primary/[.06] px-4 py-3.5'
+            }
+          >
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Risk / {result.riskLevel}</h3>
+            <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground" dir="auto">{result.verdict}</p>
+          </div>
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">What kind</h3>
+            <p className="mt-1.5 text-sm font-medium leading-6 text-foreground" dir="auto">{result.kind}</p>
+          </div>
+          {result.signals.length > 0 && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Warning signs</h3>
+              <ul className="mt-1.5 space-y-1.5">
+                {result.signals.map((signal, index) => (
+                  <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">• {signal}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {result.evidence.length > 0 && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Evidence</h3>
+              <ul className="mt-1.5 space-y-1.5">
+                {result.evidence.map((item, index) => (
+                  <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">“{item}”</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">What to do</h3>
+            <ul className="mt-1.5 space-y-1.5">
+              {result.whatToDo.map((step, index) => (
+                <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">{index + 1}. {step}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">How to handle it</h3>
+            <p className="mt-1.5 text-sm leading-6 text-muted-foreground" dir="auto">{result.howToHandle}</p>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+      function ImageDoor({
   imageData,
   imageName,
   question,
