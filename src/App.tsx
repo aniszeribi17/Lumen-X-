@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Check,
   Copy,
+    Compass,
   CircleAlert,
   Clipboard,
   Eye,
@@ -32,10 +33,12 @@ import {
   VolumeX,
     ScrollText,
 } from 'lucide-react';
-import { analyzeInput, chatFollowUp, analyzeImage, checkShield, generalChat
+import { analyzeInput, chatFollowUp, adviseMe,
+         analyzeImage, checkShield, generalChat
        , supportChat, type
         
-        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenLanguage, type LumenShieldRead
+        LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenAdvisorRead,
+        type LumenLanguage, type LumenShieldRead
         
         , type LumenMode } from './api';
 import { prepareImageForAnalysis } from './image';
@@ -137,6 +140,12 @@ function Home() {
   const [shieldError, setShieldError] = useState('');
   const [isShieldReading, setIsShieldReading] = useState(false);
   const [isShieldImageProcessing, setIsShieldImageProcessing] = useState(false);
+    const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [advisorSituation, setAdvisorSituation] = useState('');
+  const [advisorResult, setAdvisorResult] = useState<LumenAdvisorRead | null>(null);
+  const [advisorError, setAdvisorError] = useState('');
+  const [isAdvising, setIsAdvising] = useState(false);
+  
   
   
       
@@ -536,6 +545,21 @@ function Home() {
     }
   };
   
+  const sendAdvisor = async () => {
+    if (!advisorSituation.trim() || isAdvising) return;
+    setIsAdvising(true);
+    setAdvisorError('');
+    try {
+      const result = await adviseMe({ situation: advisorSituation.trim(), language });
+      setAdvisorResult(result);
+    } catch (error) {
+      setAdvisorError(error instanceof Error && error.message ? error.message : 'Lumen could not advise on that. Check your connection and try again.');
+    } finally {
+      setIsAdvising(false);
+    }
+  };
+  
+  
   
   
                                               
@@ -715,27 +739,36 @@ function Home() {
                         </button>
                       )}
                       
-                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); }}
+                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); }}
+                                              
                                               
                                               data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                                               
                         
                         <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Support</span>
-                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); }}
+                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); }}
                                                        
-                                                       data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                                                       
+          setShieldOpen(false); setAdvisorOpen(false); }}
+                   data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Chat</span>
                       </button>
-                                            <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); setShieldOpen(false); }}
+                                            <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); 
                                               data-testid="button-image-composer" aria-pressed={imageDoorOpen} className={imageDoorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <ScanEye className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Image</span>
                       </button>
-                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-shield-composer" aria-pressed={shieldOpen} className={shieldOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setAdvisorOpen(false); }}
+                                              data-testid="button-shield-composer" aria-pressed={shieldOpen} className={shieldOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
                         <ShieldAlert className="h-4 w-4 text-accent" strokeWidth={1.7} />
                         <span className="hidden sm:inline">Your Shield</span>
+                                                                    </button>
+                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-advisor-composer" aria-pressed={advisorOpen} className={advisorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
+                        <Compass className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        <span className="hidden sm:inline">Your Advisor</span>
+                        
                       </button>
                       
                       
@@ -836,6 +869,21 @@ function Home() {
                   />
                 </div>
               )}
+              
+                    {advisorOpen && (
+                      <div className="mb-3">
+                        <AdvisorDoor
+                          situation={advisorSituation}
+                          result={advisorResult}
+                          error={advisorError}
+                          isAdvising={isAdvising}
+                          onSituationChange={setAdvisorSituation}
+                          onAnalyze={() => void sendAdvisor()}
+                          language={language}
+                        />
+                      </div>
+                    )}
+              
 
                     {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
@@ -1357,6 +1405,102 @@ const SUPPORT_INTRO: Record<LumenLanguage, string> = {
   de: 'Ein ruhiger Raum, um auszusprechen, was dich beschäftigt. Ich bin ein Begleiter zur Unterstützung in dieser App: Ich höre zu, helfe dir, deine Gedanken zu ordnen, Fakten von Ängsten zu trennen und dein Gleichgewicht wiederzufinden. Ich bin kein Arzt und kein Therapeut — ich stelle keine Diagnosen und behandle nicht. Wenn das, was du trägst, schwer oder anhaltend ist, ist ein echter Fachmann die richtige Tür.',
   pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
 };
+
+function AdvisorDoor({
+  situation,
+  result,
+  error,
+  isAdvising,
+  onSituationChange,
+  onAnalyze,
+  language,
+}: {
+  situation: string;
+  result: LumenAdvisorRead | null;
+  error: string;
+  isAdvising: boolean;
+  onSituationChange: (value: string) => void;
+  onAnalyze: () => void;
+  language: LumenLanguage;
+}) {
+  return (
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-advisor-door">
+      <div className="flex items-center gap-2 text-accent">
+        <Compass className="h-4 w-4" strokeWidth={1.7} />
+        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your genius advisor</h2>
+      </div>
+      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Describe your situation or the decision in front of you. I give you one clear verdict, the action to take, and the exact words when someone else is involved.</p>
+
+      <textarea
+        value={situation}
+        onChange={(event) => onSituationChange(event.target.value)}
+        data-testid="input-advisor-situation" dir="ltr"
+        placeholder="My situation is..."
+        maxLength={20000}
+        rows={4}
+        className="mt-5 w-full resize-y rounded-lg border border-border/90 bg-background/40 px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+      />
+
+      <button type="button" onClick={onAnalyze} disabled={!situation.trim() || isAdvising} data-testid="button-advisor-analyze" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        {isAdvising ? (
+          <>
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+            Thinking
+          </>
+        ) : (
+          <>
+            <Compass className="h-4 w-4" strokeWidth={1.9} />
+            Advise me
+          </>
+        )}
+      </button>
+
+      {error && (
+        <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-advisor-error">{error}</p>
+      )}
+
+      {result && (
+        <div className="mt-5 space-y-3" data-testid="container-advisor-result">
+          <div className="rounded-xl border border-primary/25 bg-primary/[.06] px-4 py-3.5">
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">The verdict</h3>
+            <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground" dir="auto">{result.verdict}</p>
+          </div>
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Why</h3>
+            <ul className="mt-1.5 space-y-1.5">
+              {result.why.map((reason, index) => (
+                <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">• {reason}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Your one action</h3>
+            <p className="mt-1.5 text-sm font-medium leading-6 text-foreground" dir="auto">{result.theAction}</p>
+          </div>
+          {result.exactWords && (
+            <div>
+              <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Say exactly this</h3>
+              <p className="mt-1.5 rounded-lg border border-border/70 bg-background/40 px-3.5 py-3 text-sm leading-6 text-foreground" dir="auto">“{result.exactWords}”</p>
+            </div>
+          )}
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Avoid</h3>
+            <ul className="mt-1.5 space-y-1.5">
+              {result.avoid.map((item, index) => (
+                <li key={index} className="text-sm leading-6 text-muted-foreground" dir="auto">• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">If you do nothing</h3>
+            <p className="mt-1.5 text-sm leading-6 text-muted-foreground" dir="auto">{result.costOfWaiting}</p>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 
 function ShieldDoor({
   text,
