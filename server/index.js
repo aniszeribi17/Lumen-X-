@@ -302,6 +302,20 @@ function isValidStudyRead(value) {
     typeof value.check === 'string' &&
     typeof value.watchOut === 'string'
   );
+  function buildResearchSystemPrompt(languageLabel) {
+  return `You are Lumen, the assistant inside the Lumen X app, acting as the user's research desk. The user asks a question and wants a detailed answer backed by evidence from the web.
+
+Your identity: you are Lumen, the assistant inside the Lumen X app, and you were designed by Anis Zeribi, who designed everything about you and this app. Whenever the user asks who designed you, who made you, or who created you, answer clearly that Anis Zeribi designed you, and always write his name in Latin letters exactly like this: Anis Zeribi. Never say or imply that Google or any other company made you, and never name an AI model as your creator.
+
+How you research:
+- Search the web for the question and base your answer on what the sources actually say, not on memory alone.
+- Give a detailed, well-ordered answer: the direct answer first, then the supporting detail.
+- Name the source of each key fact inside the answer (the organization, the publication, or the author), the way a careful researcher does.
+- Separate established fact from opinion, prediction, and rumor; say plainly which is which.
+- If the evidence is weak, old, or contradictory, say so honestly instead of sounding sure.
+- Write the whole answer strictly in ${languageLabel}.`;
+  }
+  
 }
 
     function buildScamSystemPrompt(languageLabel) {
@@ -1234,6 +1248,101 @@ app.post('/api/lumen/study', async (req, res) => {
     console.error('Lumen study failed:', error);
     return res.status(502).json({ error: "Lumen couldn't solve that. Please try again." });
   }
+  app.post('/api/lumen/research', async (req, res) => {
+  const body = req.body ?? {};
+  const question = typeof body.question === 'string' ? body.question.trim() : '';
+  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+    ? body.language
+    : body.language === undefined
+      ? 'en'
+      : null;
+
+  if (language === null || !question || question.length > 4000) {
+    return res.status(400).json({ error: 'Please write your research question first.' });
+  }
+
+  let apiKey;
+  try {
+    apiKey = getGeminiApiKey();
+  } catch (error) {
+    console.error('Gemini API key is unavailable:', error);
+    return res.status(503).json({ error: 'Lumen is not connected yet. Please try again later.' });
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildResearchSystemPrompt(LANGUAGE_LABELS[language]) }],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: question }],
+            },
+          ],
+          tools: [{ google_search: {} }],
+          generationConfig: {
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const upstreamBody = await response.text();
+      console.error('Gemini research request failed:', response.status, upstreamBody.slice(0, 1000));
+      return res.status(502).json({ error: "Lumen couldn't research that. Please try again." });
+    }
+
+    const responseBody = await response.json();
+    const candidate = responseBody.candidates?.[0];
+    const answer = candidate?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+
+    if (!answer) {
+      return res.status(500).json({ error: "Lumen couldn't find enough on that yet." });
+    }
+
+    const chunks = candidate?.groundingMetadata?.groundingChunks ?? [];
+    const seen = new Set();
+    const sources = [];
+    for (const chunk of chunks) {
+      const web = chunk?.web;
+      if (web && typeof web.uri === 'string' && web.uri && !seen.has(web.uri)) {
+        seen.add(web.uri);
+        sources.push({
+          title: typeof web.title === 'string' && web.title ? web.title : web.uri,
+          uri: web.uri,
+        });
+      }
+      if (sources.length >= 8) break;
+    }
+
+    return res.json({ answer, sources });
+  } catch (error) {
+    console.error('Lumen research failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't research that. Please try again." });
+  }
+});
+      
 });
       
       // Unknown API routes get a JSON 404, not the web page.
