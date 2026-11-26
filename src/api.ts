@@ -353,3 +353,75 @@ export async function researchTopic(input: LumenResearchInput): Promise<LumenRes
   }
   return { answer: body.answer, sources: Array.isArray(body.sources) ? body.sources : [] };
 }
+
+
+async function streamRequest(path: string, input: unknown, onChunk: (text: string) => void): Promise<string> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...(input as Record<string, unknown>), stream: true }),
+  });
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body && typeof body.error === 'string' && body.error) message = body.error;
+    } catch {
+      // keep the default message
+    }
+    throw new Error(message);
+  }
+  if (!response.body) throw new Error('Streaming is not available right now.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let full = '';
+  let streamError = '';
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('data:')) return;
+    const data = trimmed.slice(5).trim();
+    if (!data || data === '[DONE]') return;
+    try {
+      const payload = JSON.parse(data) as { t?: string; error?: string };
+      if (typeof payload.t === 'string' && payload.t) {
+        full += payload.t;
+        onChunk(payload.t);
+      }
+      if (typeof payload.error === 'string' && payload.error) streamError = payload.error;
+    } catch {
+      // ignore partial lines
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf('\n');
+    while (idx >= 0) {
+      handleLine(buffer.slice(0, idx));
+      buffer = buffer.slice(idx + 1);
+      idx = buffer.indexOf('\n');
+    }
+  }
+  if (buffer.trim()) handleLine(buffer);
+  if (streamError && !full) throw new Error(streamError);
+  const reply = full.trim();
+  if (!reply) throw new Error("Lumen couldn't find an answer for that yet.");
+  return reply;
+}
+
+/** Follow-up chat with the reply written live, chunk by chunk. */
+export async function chatFollowUpStream(input: LumenChatInput, onChunk: (text: string) => void): Promise<string> {
+  return streamRequest('/api/lumen/chat', input, onChunk);
+}
+
+/** Support chat with the reply written live, chunk by chunk. */
+export async function supportChatStream(input: LumenSupportInput, onChunk: (text: string) => void): Promise<string> {
+  return streamRequest('/api/lumen/support', input, onChunk);
+}
+
+/** General chat with the reply written live, chunk by chunk. */
+export async function generalChatStream(input: LumenGeneralInput, onChunk: (text: string) => void): Promise<string> {
+  return streamRequest('/api/lumen/general-chat', input, onChunk);
+}
