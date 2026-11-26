@@ -41,8 +41,8 @@ import {
     ScrollText,
 } from 'lucide-react';
 import { analyzeInput, chatFollowUp, adviseMe, solveStudy, researchTopic,
-         analyzeImage, checkShield, generalChat
-       , supportChat, type
+         analyzeImage, checkShield, generalChat, generalChatStream, chatFollowUpStream
+       , supportChat, supportChatStream, type
 
         LumenAnalysis, type LumenChatMessage, type LumenImageRead, type LumenAdvisorRead, type LumenStudyRead, type LumenResearchResult,
         type LumenLanguage, type LumenShieldRead
@@ -133,7 +133,9 @@ function Home() {
   const [supportInput, setSupportInput] = useState('');
   const [supportError, setSupportError] = useState('');
   const [isSupporting, setIsSupporting] = useState(false);
-    const [talkOpen, setTalkOpen] = useState(false);
+    const [talkOpen, setTalkOpen] = useState(true);
+  const [readOpen, setReadOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [talkMessages, setTalkMessages] = useState<LumenChatMessage[]>([]);
   const [talkInput, setTalkInput] = useState('');
   const [talkError, setTalkError] = useState('');
@@ -394,6 +396,14 @@ function Home() {
     setMode(entry.mode);
     setView('result');
     setErrorMessage('');
+    setReadOpen(true);
+    setTalkOpen(false);
+    setSupportOpen(false);
+    setImageDoorOpen(false);
+    setShieldOpen(false);
+    setAdvisorOpen(false);
+    setStudyOpen(false);
+    setResearchOpen(false);
   };
 
   const deleteRead = (id: number) => {
@@ -475,18 +485,39 @@ function Home() {
     setChatError('');
     setIsChatting(true);
     const chatRequestId = ++chatRequestIdRef.current;
+    let streamed = '';
     try {
-      const reply = await chatFollowUp({
+      const reply = await chatFollowUpStream({
         prompt: analysisPrompt,
         analysis,
         messages: nextMessages,
         language: analysisLanguage,
+      }, (chunk) => {
+        if (chatRequestId !== chatRequestIdRef.current) return;
+        streamed += chunk;
+        setChatMessages([...nextMessages, { role: 'assistant', text: streamed }]);
       });
       if (chatRequestId !== chatRequestIdRef.current) return;
       setChatMessages([...nextMessages, { role: 'assistant', text: reply }]);
     } catch (error) {
       if (chatRequestId !== chatRequestIdRef.current) return;
-      setChatError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      if (!streamed) {
+        try {
+          const reply = await chatFollowUp({
+            prompt: analysisPrompt,
+            analysis,
+            messages: nextMessages,
+            language: analysisLanguage,
+          });
+          if (chatRequestId !== chatRequestIdRef.current) return;
+          setChatMessages([...nextMessages, { role: 'assistant', text: reply }]);
+        } catch (fallbackError) {
+          if (chatRequestId !== chatRequestIdRef.current) return;
+          setChatError(fallbackError instanceof Error && fallbackError.message ? fallbackError.message : 'Lumen could not answer that. Check your connection and try again.');
+        }
+      } else {
+        setChatError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      }
     } finally {
       if (chatRequestId === chatRequestIdRef.current) setIsChatting(false);
     }
@@ -501,13 +532,29 @@ function Home() {
     setSupportError('');
     setIsSupporting(true);
     const supportRequestId = ++supportRequestIdRef.current;
+    let streamed = '';
     try {
-      const reply = await supportChat({ messages: nextMessages, language });
+      const reply = await supportChatStream({ messages: nextMessages, language }, (chunk) => {
+        if (supportRequestId !== supportRequestIdRef.current) return;
+        streamed += chunk;
+        setSupportMessages([...nextMessages, { role: 'assistant', text: streamed }]);
+      });
       if (supportRequestId !== supportRequestIdRef.current) return;
       setSupportMessages([...nextMessages, { role: 'assistant', text: reply }]);
     } catch (error) {
       if (supportRequestId !== supportRequestIdRef.current) return;
-      setSupportError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      if (!streamed) {
+        try {
+          const reply = await supportChat({ messages: nextMessages, language });
+          if (supportRequestId !== supportRequestIdRef.current) return;
+          setSupportMessages([...nextMessages, { role: 'assistant', text: reply }]);
+        } catch (fallbackError) {
+          if (supportRequestId !== supportRequestIdRef.current) return;
+          setSupportError(fallbackError instanceof Error && fallbackError.message ? fallbackError.message : 'Lumen could not answer that. Check your connection and try again.');
+        }
+      } else {
+        setSupportError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      }
     } finally {
       if (supportRequestId === supportRequestIdRef.current) setIsSupporting(false);
     }
@@ -522,13 +569,29 @@ function Home() {
     setTalkError('');
     setIsTalking(true);
     const talkRequestId = ++talkRequestIdRef.current;
+    let streamed = '';
     try {
-      const reply = await generalChat({ messages: nextMessages, language });
+      const reply = await generalChatStream({ messages: nextMessages, language }, (chunk) => {
+        if (talkRequestId !== talkRequestIdRef.current) return;
+        streamed += chunk;
+        setTalkMessages([...nextMessages, { role: 'assistant', text: streamed }]);
+      });
       if (talkRequestId !== talkRequestIdRef.current) return;
       setTalkMessages([...nextMessages, { role: 'assistant', text: reply }]);
     } catch (error) {
       if (talkRequestId !== talkRequestIdRef.current) return;
-      setTalkError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      if (!streamed) {
+        try {
+          const reply = await generalChat({ messages: nextMessages, language });
+          if (talkRequestId !== talkRequestIdRef.current) return;
+          setTalkMessages([...nextMessages, { role: 'assistant', text: reply }]);
+        } catch (fallbackError) {
+          if (talkRequestId !== talkRequestIdRef.current) return;
+          setTalkError(fallbackError instanceof Error && fallbackError.message ? fallbackError.message : 'Lumen could not answer that. Check your connection and try again.');
+        }
+      } else {
+        setTalkError(error instanceof Error && error.message ? error.message : 'Lumen could not answer that. Check your connection and try again.');
+      }
     } finally {
       if (talkRequestId === talkRequestIdRef.current) setIsTalking(false);
     }
@@ -703,6 +766,7 @@ function Home() {
 
   const openDoorFromPanel = (door: 'chat' | 'study') => {
     setPanelOpen(false);
+    setReadOpen(false);
     setSupportOpen(false);
     setImageDoorOpen(false);
     setShieldOpen(false);
@@ -734,6 +798,14 @@ function Home() {
     setView('empty');
     setErrorMessage('');
     setCopied(false);
+    setReadOpen(true);
+    setTalkOpen(false);
+    setSupportOpen(false);
+    setImageDoorOpen(false);
+    setShieldOpen(false);
+    setAdvisorOpen(false);
+    setStudyOpen(false);
+    setResearchOpen(false);
   };
 
   return (
@@ -978,6 +1050,7 @@ function Home() {
 
           <section className="mx-auto grid grid-cols-[minmax(0,1fr)] w-full
             max-w-[1260px] flex-1 items-start gap-9 pb-5 pt-10 sm:pt-14 lg:grid-cols-[minmax(280px,.72fr)_minmax(500px,1.28fr)] lg:gap-x-20 lg:gap-y-10 lg:pb-10 lg:pt-20">
+              {!talkOpen && (
             <div className="appear-delay-1 min-w-0 max-w-[480px]
               ">
               <div className="mb-6 flex items-center gap-3">
@@ -1004,8 +1077,16 @@ function Home() {
                 </div>
               </div>
             </div>
+              )}
 
             <div className="appear appear-delay-2 w-full">
+                  {(readOpen || supportOpen || imageDoorOpen || shieldOpen || advisorOpen || studyOpen || researchOpen) && (
+                    <button type="button" onClick={() => { setReadOpen(false); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); setTalkOpen(true); }} data-testid="button-back-to-chat" className="mb-4 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.7} />
+                      Your Chat
+                    </button>
+                  )}
+                  {readOpen && (
               <form onSubmit={handleSubmit} className="luminous-panel rounded-[22px] p-2 sm:p-3">
                 <div className="input-frame rounded-[16px] p-4 sm:p-5">
                   <div className="flex items-center justify-between">
@@ -1076,64 +1157,7 @@ function Home() {
                         </button>
                       )}
                       
-                                            <button type="button" onClick={() => { setSupportOpen((open) => !open); setTalkOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }}
-                                              
-                                              
-                                              
-
-                                              
-                                              data-testid="button-support-composer" aria-pressed={supportOpen} className={supportOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                                              
-                        
-                        <Heart className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Support</span>
-                      </button>                      <button type="button" onClick={() => { setTalkOpen((open) => !open); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }}
-                                                       
-                                                       
-                   data-testid="button-talk-composer" aria-pressed={talkOpen} className={talkOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Chat</span>
-                      </button>
-                                                                                        <button type="button" onClick={() => { setImageDoorOpen((open) => !open); setTalkOpen(false); setSupportOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }}
-                                                                                          
-                                                                                          
-                                                                                          
-                                              data-testid="button-image-composer" aria-pressed={imageDoorOpen} className={imageDoorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <ScanEye className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Image</span>
-                      </button>
-                                            <button type="button" onClick={() => { setShieldOpen((open) => !open); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }}
-                                              
-                                              
-                                              data-testid="button-shield-composer" aria-pressed={shieldOpen} className={shieldOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <ShieldAlert className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Shield</span>
-                                                                    </button>
-                      <button type="button" onClick={() => { setAdvisorOpen((open) => !open); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setStudyOpen(false); setResearchOpen(false); }}
-                        
-                      
-                        data-testid="button-advisor-composer" aria-pressed={advisorOpen} className={advisorOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <Compass className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Advisor</span>
-
-                                              </button>
-                      <button type="button" onClick={() => { setStudyOpen((open) => !open); setAdvisorOpen(false); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); setResearchOpen(false); }}
-                        data-testid="button-study-composer" aria-pressed={studyOpen} className={studyOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <GraduationCap className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Study</span>
-                        
-                      </button>
-                                            <button type="button" onClick={() => { setResearchOpen((open) => !open); setStudyOpen(false); setAdvisorOpen(false); setShieldOpen(false); setImageDoorOpen(false); setTalkOpen(false); setSupportOpen(false); }} data-testid="button-research-composer" aria-pressed={researchOpen} className={researchOpen ? 'group flex items-center gap-2 rounded-lg bg-primary/15 px-2 py-1.5 text-xs font-medium text-foreground transition-colors' : 'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'}>
-                        <Search className="h-4 w-4 text-accent" strokeWidth={1.7} />
-                        <span className="hidden sm:inline">Your Research</span>
-                      </button>
-                      
-                      
-                      
-                      
-
-                      
-                    </div>
+                  </div>
                     <button type="submit" disabled={isAnalyzing || isImageProcessing} data-testid="button-analyze" className="group flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground shadow-[0_10px_25px_-15px_hsl(73_100%_62%/.8)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-wait disabled:opacity-65">
                       {isImageProcessing ? (
                         <>
@@ -1152,9 +1176,10 @@ function Home() {
                         </>
                       )}
                     </button>
-                  </div>
+                </div>
                 </div>
               </form>
+                  )}
               <p className="mt-3 flex items-center gap-2 text-[10px] leading-5 text-muted-foreground/70">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.6} />
                 Private by design. Lumen reads the context, not your mind.
@@ -1178,6 +1203,47 @@ function Home() {
                 </div>
               )}
               
+                          {talkOpen && (
+                            <div className="luminous-panel mb-4 rounded-[18px] p-3" data-testid="container-door-options">
+                              <button type="button" onClick={() => setOptionsOpen((open) => !open)} data-testid="button-toggle-options" aria-expanded={optionsOpen} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-secondary">
+                                <Plus className="h-4 w-4 text-primary" strokeWidth={1.7} />
+                                Choose a service
+                                <ChevronLeft className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${optionsOpen ? '-rotate-90' : 'rotate-180'}`} strokeWidth={1.7} />
+                              </button>
+                              {optionsOpen && (
+                                <div className="mt-1 space-y-0.5">
+                                  <button type="button" onClick={() => { setReadOpen(true); setTalkOpen(false); setOptionsOpen(false); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }} data-testid="button-option-read" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <Eye className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Read
+                                  </button>
+                                  <button type="button" onClick={() => { setImageDoorOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setSupportOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }} data-testid="button-option-image" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <ScanEye className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Image
+                                  </button>
+                                  <button type="button" onClick={() => { setShieldOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setSupportOpen(false); setImageDoorOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }} data-testid="button-option-shield" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <ShieldAlert className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Shield
+                                  </button>
+                                  <button type="button" onClick={() => { setAdvisorOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setStudyOpen(false); setResearchOpen(false); }} data-testid="button-option-advisor" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <Compass className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Advisor
+                                  </button>
+                                  <button type="button" onClick={() => { setStudyOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setResearchOpen(false); }} data-testid="button-option-study" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <GraduationCap className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Study
+                                  </button>
+                                  <button type="button" onClick={() => { setResearchOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setSupportOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); }} data-testid="button-option-research" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <Search className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Your Research
+                                  </button>
+                                  <button type="button" onClick={() => { setSupportOpen(true); setTalkOpen(false); setReadOpen(false); setOptionsOpen(false); setImageDoorOpen(false); setShieldOpen(false); setAdvisorOpen(false); setStudyOpen(false); setResearchOpen(false); }} data-testid="button-option-support" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                                    <Heart className="h-[18px] w-[18px] text-primary" strokeWidth={1.7} />
+                                    Support
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {talkOpen && (
                 <div className="mb-3">
                   <GeneralChat
@@ -1275,6 +1341,7 @@ function Home() {
                     )}
               
               
+                  {!talkOpen && (<>
                     {isAnalyzing && <LoadingState />}
               {!isAnalyzing && view === 'error' && <ErrorState message={errorMessage} onRetry={() => void submitAnalysis()} />}
                             {!isAnalyzing && view === 'result' && analysis && (
@@ -1458,14 +1525,8 @@ function Home() {
                  
                 </div>
               )}
+                  </>)}
       
-                            {!isAnalyzing && view === 'empty' && !analysis && (
-                <div className="space-y-3">
-                  <EmptyState />
-                  {history.length > 0 && <HistoryPanel history={history} onRestore={restoreRead} onDelete={deleteRead} />}    
-                   
-                </div>
-              )}
               
             </div>
           </section>
