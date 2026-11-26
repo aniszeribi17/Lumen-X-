@@ -1464,22 +1464,35 @@ async function botGemini(systemPrompt, contents, asJson) {
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
   );
   endpoint.searchParams.set('key', apiKey);
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: asJson
-        ? { responseMimeType: 'application/json', maxOutputTokens: 8192 }
-        : { maxOutputTokens: 4096 },
-    }),
-  });
-  if (!response.ok) throw new Error(`Gemini bot request failed: ${response.status}`);
-  const body = await response.json();
-  return (
-    body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim() ?? ''
-  );
+  const delays = [2000, 4000, 6000, 10000];
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: asJson
+            ? { responseMimeType: 'application/json', maxOutputTokens: 8192 }
+            : { maxOutputTokens: 4096 },
+        }),
+      });
+      if (!response.ok) throw new Error(`Gemini bot request failed: ${response.status}`);
+      const body = await response.json();
+      const text =
+        body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim() ?? '';
+      if (text) return text;
+      throw new Error('Gemini bot request returned an empty reply');
+    } catch (error) {
+      if (attempt === 4) {
+        console.error('Bot Gemini failed after retries:', error);
+        return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
+  }
+  return null;
 }
 
 function botParseJson(text) {
@@ -1494,7 +1507,7 @@ function botList(items) {
   return (Array.isArray(items) ? items : []).map((item) => `• ${item}`).join('\n');
 }
 
-async function botBrain(state, text) {
+async function botBrainInner(state, text) {
   const label = botLabelFor(text, state);
   const userTurn = { role: 'user', parts: [{ text }] };
 
@@ -1504,13 +1517,18 @@ async function botBrain(state, text) {
     state.history.push(userTurn);
     state.history = state.history.slice(-20);
     const reply = await botGemini(system, state.history, false);
+    if (!reply) {
+      state.history.pop();
+      return null;
+    }
     state.history.push({ role: 'model', parts: [{ text: reply }] });
     state.history = state.history.slice(-20);
-    return reply || '…';
+    return reply;
   }
 
   if (state.mode === 'analyze') {
     const raw = await botGemini(buildSystemPrompt(label), [userTurn], true);
+    if (!raw) return null;
     const data = botParseJson(raw);
     if (!data) return raw;
     return [
@@ -1525,6 +1543,7 @@ async function botBrain(state, text) {
 
   if (state.mode === 'shield') {
     const raw = await botGemini(buildShieldSystemPrompt(label), [userTurn], true);
+    if (!raw) return null;
     const data = botParseJson(raw);
     if (!data) return raw;
     return [
@@ -1540,6 +1559,7 @@ async function botBrain(state, text) {
 
   if (state.mode === 'advisor') {
     const raw = await botGemini(buildAdvisorSystemPrompt(label), [userTurn], true);
+    if (!raw) return null;
     const data = botParseJson(raw);
     if (!data) return raw;
     return [
@@ -1556,6 +1576,7 @@ async function botBrain(state, text) {
 
   if (state.mode === 'study') {
     const raw = await botGemini(buildStudySystemPrompt(label), [userTurn], true);
+    if (!raw) return null;
     const data = botParseJson(raw);
     if (!data) return raw;
     const steps = (Array.isArray(data.steps) ? data.steps : [])
@@ -1574,10 +1595,24 @@ async function botBrain(state, text) {
   }
 
   if (state.mode === 'research') {
-    return (await botGemini(buildResearchSystemPrompt(label), [userTurn], false)) || '…';
+    const raw = await botGemini(buildResearchSystemPrompt(label), [userTurn], false);
+    return raw || null;
   }
 
   return '…';
+}
+
+const BOT_BUSY =
+  '⏳ The service is busy right now — please try again in a moment.\nالخدمة مشغولة درك، عاود المحاولة بعد لحظات.';
+
+async function botBrain(state, text) {
+  try {
+    const reply = await botBrainInner(state, text);
+    return reply || BOT_BUSY;
+  } catch (error) {
+    console.error('Bot brain failed:', error);
+    return BOT_BUSY;
+  }
 }
 
 const BOT_SERVICES = [
