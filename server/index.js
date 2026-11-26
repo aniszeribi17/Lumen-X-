@@ -1360,6 +1360,11 @@ function getBotState(id) {
 
 function botLabelFor(text, state) {
   if (/[\u0600-\u06FF]/.test(text)) state.label = 'Arabic';
+    else if (/[\u3040-\u30FF]/.test(text)) state.label = 'Japanese';
+  else if (/[\u4E00-\u9FFF]/.test(text)) state.label = 'Chinese';
+  else if (/[\uAC00-\uD7AF]/.test(text)) state.label = 'Korean';
+  else if (/[\u0400-\u04FF]/.test(text)) state.label = 'Russian';
+  
   return state.label;
 }
 
