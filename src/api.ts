@@ -356,11 +356,30 @@ export async function researchTopic(input: LumenResearchInput): Promise<LumenRes
 
 
 async function streamRequest(path: string, input: unknown, onChunk: (text: string) => void): Promise<string> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...(input as Record<string, unknown>), stream: true }),
-  });
+  const delays = [1500, 3000, 5000, 8000];
+  let response: Response | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      response = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(input as Record<string, unknown>), stream: true }),
+      });
+      if (response.status !== 502 && response.status !== 503 && response.status !== 429) break;
+      lastError = new Error(`Request failed with status ${response.status}`);
+      response = null;
+    } catch (error) {
+      lastError = error;
+      response = null;
+    }
+    if (attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
+  }
+  if (!response) {
+    throw lastError instanceof Error ? lastError : new Error('Request failed.');
+  }
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
     try {
