@@ -7,6 +7,11 @@ import {
     Compass,
     GraduationCap,
     Search,
+    ChevronLeft,
+  Folder,
+  MoreVertical,
+  Plus,
+  Settings,
   CircleAlert,
   Clipboard,
   Eye,
@@ -70,6 +75,13 @@ interface SavedRead {
   language: LumenLanguage;
   mode: LumenMode;
   at: string;
+  interface LumenProject {
+  id: number;
+  title: string;
+  note: string;
+  at: string;
+  }
+  
 }
 
 
@@ -161,6 +173,21 @@ function Home() {
   const [researchResult, setResearchResult] = useState<LumenResearchResult | null>(null);
   const [researchError, setResearchError] = useState('');
   const [isResearching, setIsResearching] = useState(false);
+    const [panelOpen, setPanelOpen] = useState(false);
+  const [panelView, setPanelView] = useState<'menu' | 'projects' | 'settings'>('menu');
+  const [projects, setProjects] = useState<LumenProject[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('lumen-x-projects');
+      const parsed = raw ? (JSON.parse(raw) as LumenProject[]) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  const [projectTitle, setProjectTitle] = useState('');
+  const [openProjectId, setOpenProjectId] = useState<number | null>(null);
+  const [dataCleared, setDataCleared] = useState(false);
+  
   
   
   
@@ -624,6 +651,53 @@ function Home() {
       setIsResearching(false);
     }
   };
+    const saveProjects = (next: LumenProject[]) => {
+    setProjects(next);
+    try {
+      window.localStorage.setItem('lumen-x-projects', JSON.stringify(next));
+    } catch {
+      // Storage can be unavailable in private browsing; the panel still works for this session.
+    }
+  };
+
+  const createProject = () => {
+    const title = projectTitle.trim();
+    if (!title) return;
+    saveProjects([{ id: Date.now(), title, note: '', at: new Date().toISOString() }, ...projects]);
+    setProjectTitle('');
+  };
+
+  const deleteProject = (id: number) => {
+    saveProjects(projects.filter((project) => project.id !== id));
+    if (openProjectId === id) setOpenProjectId(null);
+  };
+
+  const updateProjectNote = (id: number, note: string) => {
+    saveProjects(projects.map((project) => (project.id === id ? { ...project, note } : project)));
+  };
+
+  const clearAllData = () => {
+    setHistory([]);
+    saveProjects([]);
+    try {
+      window.localStorage.removeItem('lumen-x-history');
+      window.localStorage.removeItem('lumen-x-projects');
+    } catch {
+      // Nothing else to do; in-memory state is already cleared.
+    }
+  };
+
+  const openDoorFromPanel = (door: 'chat' | 'study') => {
+    setPanelOpen(false);
+    setSupportOpen(false);
+    setImageDoorOpen(false);
+    setShieldOpen(false);
+    setAdvisorOpen(false);
+    setResearchOpen(false);
+    setTalkOpen(door === 'chat');
+    setStudyOpen(door === 'study');
+  };
+  
   
   
   
@@ -703,9 +777,176 @@ function Home() {
 
                 </select>
               </label>
+                            <button type="button" onClick={() => { setPanelView('menu'); setPanelOpen(true); }} data-testid="button-open-panel" aria-label="Open the Lumen panel" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border/90 bg-card/50 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                <MoreVertical className="h-4 w-4" strokeWidth={1.7} />
+              </button>
+              
               
             </div>
           </header>
+                    {panelOpen && (
+            <div className="fixed inset-0 z-50" data-testid="container-lumen-panel">
+              <button type="button" aria-label="Close the panel" onClick={() => setPanelOpen(false)} className="absolute inset-0 h-full w-full cursor-default bg-black/60" />
+              <div className={`absolute top-0 flex h-full w-[86%] max-w-[340px] flex-col bg-[#0a0b0a] p-5 ${language === 'ar' ? 'right-0 border-l border-border/70' : 'left-0 border-r border-border/70'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2.5">
+                    <span className="brand-mark grid h-9 w-9 place-items-center rounded-xl">
+                      <ScanEye className="h-[17px] w-[17px]" strokeWidth={1.7} />
+                    </span>
+                    <span className="font-display text-[1.05rem] font-semibold leading-none tracking-[-0.045em] text-foreground">lumen <span className="text-primary">x</span></span>
+                  </span>
+                  <button type="button" onClick={() => setPanelOpen(false)} data-testid="button-close-panel" aria-label="Close the panel" className="grid h-9 w-9 place-items-center rounded-lg border border-border/90 text-muted-foreground transition-colors hover:text-foreground">
+                    <X className="h-4 w-4" strokeWidth={1.7} />
+                  </button>
+                </div>
+
+                {panelView === 'menu' && (
+                  <>
+                    <button type="button" onClick={() => { resetWorkspace(); setPanelOpen(false); }} data-testid="button-panel-new-read" className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98]">
+                      <Plus className="h-4 w-4" strokeWidth={1.9} />
+                      New Read
+                    </button>
+                    <div className="mt-5 space-y-1.5">
+                      <button type="button" onClick={() => openDoorFromPanel('chat')} data-testid="button-panel-chat" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                        <MessageSquareText className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        Your Chat
+                      </button>
+                      <button type="button" onClick={() => openDoorFromPanel('study')} data-testid="button-panel-study" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                        <GraduationCap className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        Your Study
+                      </button>
+                      <button type="button" onClick={() => setPanelView('projects')} data-testid="button-panel-projects" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+                        <Folder className="h-4 w-4 text-accent" strokeWidth={1.7} />
+                        Projects
+                        <span className="ml-auto text-xs text-muted-foreground">{projects.length}</span>
+                      </button>
+                    </div>
+                    <div className="mt-6 flex items-center gap-2 text-accent">
+                      <History className="h-4 w-4" strokeWidth={1.7} />
+                      <h3 className="font-mono-label text-[9px] uppercase tracking-[.18em]">History</h3>
+                    </div>
+                    <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto">
+                      {history.length === 0 && (
+                        <p className="px-1 py-2 text-sm leading-6 text-muted-foreground">Nothing saved yet. Your reads will appear here.</p>
+                      )}
+                      {history.slice(0, 20).map((entry) => (
+                        <button key={entry.id} type="button" onClick={() => { restoreRead(entry); setPanelOpen(false); }} className="block w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-secondary">
+                          <span className="block truncate text-sm font-medium text-foreground" dir="auto">{entry.prompt || 'Image read'}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">{new Date(entry.at).toLocaleDateString()} · {entry.mode}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex items-center gap-2 border-t border-border/70 pt-4">
+                      <button type="button" onClick={() => openDoorFromPanel('chat')} data-testid="button-panel-bottom-chat" className="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98]">
+                        <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
+                        Chat
+                      </button>
+                      <button type="button" onClick={() => setPanelView('settings')} data-testid="button-panel-settings" aria-label="Settings" className="grid h-10 w-11 place-items-center rounded-lg border border-border/90 text-muted-foreground transition-colors hover:text-foreground">
+                        <Settings className="h-4 w-4" strokeWidth={1.7} />
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {panelView === 'projects' && (
+                  <>
+                    <button type="button" onClick={() => setPanelView('menu')} data-testid="button-projects-back" className="mt-5 flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.7} />
+                      Back
+                    </button>
+                    <h3 className="mt-4 font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Projects</h3>
+                    <div className="mt-3 flex items-center gap-2">
+                      <input value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} data-testid="input-project-title" dir="auto" placeholder="Project title..." maxLength={80} className="h-10 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50" />
+                      <button type="button" onClick={createProject} disabled={!projectTitle.trim()} data-testid="button-create-project" className="flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold uppercase tracking-[.04em] text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
+                        <Plus className="h-4 w-4" strokeWidth={1.9} />
+                        Create
+                      </button>
+                    </div>
+                    <div className="mt-4 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+                      {projects.length === 0 && (
+                        <p className="px-1 py-2 text-sm leading-6 text-muted-foreground">No projects yet. Create your first one above — there is no limit.</p>
+                      )}
+                      {projects.map((project) => (
+                        <div key={project.id} className="rounded-xl border border-border/70 bg-background/40 px-3.5 py-3">
+                          <button type="button" onClick={() => setOpenProjectId(openProjectId === project.id ? null : project.id)} className="block w-full text-left">
+                            <span className="block truncate text-sm font-semibold text-foreground" dir="auto">{project.title}</span>
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">{new Date(project.at).toLocaleDateString()}</span>
+                          </button>
+                          {openProjectId === project.id && (
+                            <div className="mt-3">
+                              <textarea value={project.note} onChange={(event) => updateProjectNote(project.id, event.target.value)} data-testid={`input-project-note-${project.id}`} dir="auto" placeholder="Notes for this project..." maxLength={4000} rows={4} className="w-full resize-y rounded-lg border border-border/90 bg-background/40 px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50" />
+                              <button type="button" onClick={() => deleteProject(project.id)} data-testid={`button-delete-project-${project.id}`} className="mt-2 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10">
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} />
+                                Delete project
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {panelView === 'settings' && (
+                  <>
+                    <button type="button" onClick={() => setPanelView('menu')} data-testid="button-settings-back" className="mt-5 flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.7} />
+                      Back
+                    </button>
+                    <h3 className="mt-4 font-mono-label text-[9px] uppercase tracking-[.18em] text-accent">Settings</h3>
+                    <div className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Language</p>
+                        <div className="mt-2 space-y-1">
+                          {([
+                            { value: 'en', label: 'English' },
+                            { value: 'ar', label: 'العربية' },
+                            { value: 'tr', label: 'Türkçe' },
+                            { value: 'de', label: 'Deutsch' },
+                            { value: 'pt', label: 'Português' },
+                          ] as { value: LumenLanguage; label: string }[]).map((option) => (
+                            <button key={option.value} type="button" onClick={() => setLanguage(option.value)} data-testid={`button-settings-language-${option.value}`} aria-pressed={language === option.value} className={language === option.value ? 'block w-full rounded-lg bg-primary/15 px-3 py-2 text-left text-sm font-medium text-foreground' : 'block w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'}>
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Voice</p>
+                        <div className="mt-2 flex gap-2">
+                          {([
+                            { value: 'female', label: 'Female voice' },
+                            { value: 'male', label: 'Male voice' },
+                          ] as { value: 'female' | 'male'; label: string }[]).map((option) => (
+                            <button key={option.value} type="button" onClick={() => setVoiceKind(option.value)} data-testid={`button-settings-voice-${option.value}`} aria-pressed={voiceKind === option.value} className={voiceKind === option.value ? 'h-10 flex-1 rounded-lg bg-primary/15 px-3 text-sm font-medium text-foreground' : 'h-10 flex-1 rounded-lg border border-border/90 px-3 text-sm text-muted-foreground transition-colors hover:text-foreground'}>
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Your data</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">Everything lives only on this device. Clearing removes your history and projects.</p>
+                        <button type="button" onClick={() => { clearAllData(); setDataCleared(true); }} data-testid="button-clear-data" className="mt-2 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10">
+                          <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                          Clear history and projects
+                        </button>
+                        {dataCleared && (
+                          <p className="mt-1 text-sm text-muted-foreground">Cleared.</p>
+                        )}
+                      </div>
+                      <div className="border-t border-border/70 pt-4">
+                        <p className="font-display text-[1.05rem] font-semibold leading-none tracking-[-0.045em] text-foreground">lumen <span className="text-primary">x</span></p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">Your life, clearer.</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">Designed by Anis Zeribi</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          
 
           <section className="mx-auto grid grid-cols-[minmax(0,1fr)] w-full
             max-w-[1260px] flex-1 items-start gap-9 pb-5 pt-10 sm:pt-14 lg:grid-cols-[minmax(280px,.72fr)_minmax(500px,1.28fr)] lg:gap-x-20 lg:gap-y-10 lg:pb-10 lg:pt-20">
