@@ -75,14 +75,15 @@ interface SavedRead {
   language: LumenLanguage;
   mode: LumenMode;
   at: string;
-  interface LumenProject {
+  }
+
+interface LumenProject {
   id: number;
   title: string;
   note: string;
   at: string;
-  }
-  
 }
+
 
 
 export default function App() {
