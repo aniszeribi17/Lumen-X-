@@ -419,6 +419,85 @@ app.get('/api/healthz', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+
+async function streamChatReply(res, apiKey, systemText, contents) {
+  const endpoint = new URL(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent`,
+  );
+  endpoint.searchParams.set('key', apiKey);
+  endpoint.searchParams.set('alt', 'sse');
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents,
+        generationConfig: { maxOutputTokens: 2048 },
+      }),
+    });
+  } catch (error) {
+    console.error('Gemini stream request failed:', error);
+    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+  }
+
+  if (!response.ok || !response.body) {
+    const upstreamBody = await response.text().catch(() => '');
+    console.error('Gemini stream request failed:', response.status, upstreamBody.slice(0, 1000));
+    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const killer = setTimeout(() => { reader.cancel().catch(() => {}); }, 180_000);
+  let buffer = '';
+  let sentAny = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx = buffer.indexOf('\n');
+      while (idx >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        idx = buffer.indexOf('\n');
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const payload = JSON.parse(data);
+          const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
+          if (text) {
+            sentAny = true;
+            res.write(`data: ${JSON.stringify({ t: text })}\n\n`);
+          }
+        } catch {
+          // ignore partial lines
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Gemini stream read failed:', error);
+  } finally {
+    clearTimeout(killer);
+  }
+
+  if (!sentAny) {
+    res.write(`data: ${JSON.stringify({ error: "Lumen couldn't answer that. Please try again." })}\n\n`);
+  }
+  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+  res.end();
+}
+
 app.post('/api/lumen/analyze', async (req, res) => {
   const body = req.body ?? {};
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
@@ -605,6 +684,10 @@ ${JSON.stringify(body.analysis)}`,
     })),
   ];
 
+  if (body.stream === true) {
+    return streamChatReply(res, apiKey, buildChatSystemPrompt(LANGUAGE_LABELS[language]), contents);
+  }
+
   try {
     const endpoint = new URL(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
@@ -700,6 +783,10 @@ app.post('/api/lumen/support', async (req, res) => {
     role: message.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: message.text }],
   }));
+
+  if (body.stream === true) {
+    return streamChatReply(res, apiKey, buildSupportSystemPrompt(LANGUAGE_LABELS[language]), contents);
+  }
 
   try {
     const endpoint = new URL(
@@ -797,6 +884,10 @@ app.post('/api/lumen/general-chat', async (req, res) => {
     role: message.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: message.text }],
   }));
+
+  if (body.stream === true) {
+    return streamChatReply(res, apiKey, buildGeneralSystemPrompt(LANGUAGE_LABELS[language]), contents);
+  }
 
   try {
     const endpoint = new URL(
