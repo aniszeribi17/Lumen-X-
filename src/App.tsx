@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useRef, useState } from 'react';
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -1794,37 +1794,48 @@ function FollowUpChat({
     onSend();
   };
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages, isSending]);
+
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
-      <div className="flex items-center gap-2 text-accent">
-        <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
-        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Follow-up</h2>
-      </div>
-      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Ask a follow-up about this read — Lumen remembers the message and the analysis.</p>
+    <article className="px-1 py-2" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
+      {messages.length === 0 && (
+        <p dir="ltr" className="px-1 pb-1 pt-2 text-left text-sm leading-6 text-muted-foreground">Ask a follow-up about this read — Lumen remembers the message and the analysis.</p>
+      )}
 
       {messages.length > 0 && (
-        <div className="mt-5 space-y-2.5" data-testid="list-chat-messages">
+        <div className="space-y-5" data-testid="list-chat-messages">
           {messages.map((message, index) => (
-            <div
-              key={`${message.role}-${index}`}
-              className={
-                message.role === 'user'
-                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
-                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
-              }
-            >
-              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
-                {message.role === 'user' ? 'You' : 'Lumen'}
-              </span>
-              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
-            </div>
+            message.role === 'user' ? (
+              <div key={`${message.role}-${index}`} className="flex justify-end">
+                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary/15 px-3.5 py-2.5 text-sm leading-6 text-foreground" dir="auto">{message.text}</div>
+              </div>
+            ) : (
+              <div key={`${message.role}-${index}`} className="flex gap-2.5">
+                <img src="/icon-192.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 whitespace-pre-wrap pt-0.5 text-sm leading-6 text-foreground" dir="auto">
+                  {message.text}
+                  {isSending && index === messages.length - 1 && (
+                    <span className="ml-1 inline-block h-3.5 w-[7px] translate-y-0.5 animate-pulse bg-primary" />
+                  )}
+                </div>
+              </div>
+            )
           ))}
-          {isSending && (
-            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-              Lumen is thinking...
+          {isSending && messages[messages.length - 1]?.role !== 'assistant' && (
+            <div className="flex items-center gap-2.5" aria-live="polite">
+              <img src="/icon-192.png" alt="" className="h-6 w-6 shrink-0 rounded-full" />
+              <span className="text-sm text-muted-foreground">Thinking</span>
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:300ms]" />
+              </span>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       )}
 
@@ -1832,7 +1843,7 @@ function FollowUpChat({
         <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-chat-error">{error}</p>
       )}
 
-      <form onSubmit={handleChatSubmit} className="mt-5 flex items-center gap-2">
+      <form onSubmit={handleChatSubmit} className="mt-5 flex items-center gap-2 rounded-full border border-border/90 bg-background/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-primary/50">
         <input
           type="text"
           value={input}
@@ -1840,9 +1851,9 @@ function FollowUpChat({
           data-testid="input-chat-message" dir="ltr"
           placeholder="Ask a follow-up..."
           maxLength={4000}
-          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/55"
         />
-        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-chat" aria-label="Send follow-up question" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-chat" aria-label="Send follow-up question" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
           <Send className="h-4 w-4" strokeWidth={1.9} />
         </button>
       </form>
@@ -2422,37 +2433,51 @@ function GeneralChat({
     onSend();
   };
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages, isSending]);
+
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-general-chat">
-      <div className="flex items-center gap-2 text-accent">
-        <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
-        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your chat</h2>
-      </div>
-      <p dir="ltr" className="mt-3 text-left text-sm leading-6 text-muted-foreground">Ask me anything — a question, an idea, a draft, a decision. I answer here, in your language.</p>
+    <article className="px-1 py-2" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-general-chat">
+      {messages.length === 0 && (
+        <div className="px-1 pb-2 pt-4">
+          <p className="font-display text-[22px] font-semibold tracking-[-.02em] text-foreground">Hi, I'm Lumen.</p>
+          <p dir="ltr" className="mt-2 text-left text-sm leading-6 text-muted-foreground">Ask me anything — a question, an idea, a draft, a decision. I answer here, in your language.</p>
+        </div>
+      )}
 
       {messages.length > 0 && (
-        <div className="mt-5 space-y-2.5" data-testid="list-talk-messages">
+        <div className="space-y-5" data-testid="list-talk-messages">
           {messages.map((message, index) => (
-            <div
-              key={`${message.role}-${index}`}
-              className={
-                message.role === 'user'
-                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
-                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
-              }
-            >
-              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
-                {message.role === 'user' ? 'You' : 'Lumen'}
-              </span>
-              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
-            </div>
+            message.role === 'user' ? (
+              <div key={`${message.role}-${index}`} className="flex justify-end">
+                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary/15 px-3.5 py-2.5 text-sm leading-6 text-foreground" dir="auto">{message.text}</div>
+              </div>
+            ) : (
+              <div key={`${message.role}-${index}`} className="flex gap-2.5">
+                <img src="/icon-192.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 whitespace-pre-wrap pt-0.5 text-sm leading-6 text-foreground" dir="auto">
+                  {message.text}
+                  {isSending && index === messages.length - 1 && (
+                    <span className="ml-1 inline-block h-3.5 w-[7px] translate-y-0.5 animate-pulse bg-primary" />
+                  )}
+                </div>
+              </div>
+            )
           ))}
-          {isSending && (
-            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-              Lumen is thinking...
+          {isSending && messages[messages.length - 1]?.role !== 'assistant' && (
+            <div className="flex items-center gap-2.5" aria-live="polite">
+              <img src="/icon-192.png" alt="" className="h-6 w-6 shrink-0 rounded-full" />
+              <span className="text-sm text-muted-foreground">Thinking</span>
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:300ms]" />
+              </span>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       )}
 
@@ -2460,7 +2485,7 @@ function GeneralChat({
         <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-talk-error">{error}</p>
       )}
 
-      <form onSubmit={handleTalkSubmit} className="mt-5 flex items-center gap-2">
+      <form onSubmit={handleTalkSubmit} className="mt-5 flex items-center gap-2 rounded-full border border-border/90 bg-background/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-primary/50">
         <input
           type="text"
           value={input}
@@ -2468,9 +2493,9 @@ function GeneralChat({
           data-testid="input-talk-message" dir="ltr"
           placeholder="Ask anything..."
           maxLength={4000}
-          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/55"
         />
-        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-talk" aria-label="Send message" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-talk" aria-label="Send message" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
           <Send className="h-4 w-4" strokeWidth={1.9} />
         </button>
       </form>
@@ -2500,37 +2525,51 @@ function GeneralChat({
     onSend();
   };
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages, isSending]);
+
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-support-chat">
-      <div className="flex items-center gap-2 text-accent">
-        <Heart className="h-4 w-4" strokeWidth={1.7} />
-        <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">A calmer space</h2>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{SUPPORT_INTRO[language]}</p>
+    <article className="px-1 py-2" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-support-chat">
+      {messages.length === 0 && (
+        <div className="px-1 pb-2 pt-4">
+          <p className="font-display text-[22px] font-semibold tracking-[-.02em] text-foreground">A calmer space.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{SUPPORT_INTRO[language]}</p>
+        </div>
+      )}
 
       {messages.length > 0 && (
-        <div className="mt-5 space-y-2.5" data-testid="list-support-messages">
+        <div className="space-y-5" data-testid="list-support-messages">
           {messages.map((message, index) => (
-            <div
-              key={`${message.role}-${index}`}
-              className={
-                message.role === 'user'
-                  ? 'rounded-xl border border-primary/20 bg-primary/[.07] px-3.5 py-3 text-sm leading-6 text-foreground'
-                  : 'rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm leading-6 text-foreground'
-              }
-            >
-              <span className="mb-1.5 block font-mono-label text-[8px] uppercase tracking-[.16em] text-muted-foreground">
-                {message.role === 'user' ? 'You' : 'Lumen'}
-              </span>
-              <span className="whitespace-pre-wrap" dir="auto">{message.text}</span>
-            </div>
+            message.role === 'user' ? (
+              <div key={`${message.role}-${index}`} className="flex justify-end">
+                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary/15 px-3.5 py-2.5 text-sm leading-6 text-foreground" dir="auto">{message.text}</div>
+              </div>
+            ) : (
+              <div key={`${message.role}-${index}`} className="flex gap-2.5">
+                <img src="/icon-192.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 whitespace-pre-wrap pt-0.5 text-sm leading-6 text-foreground" dir="auto">
+                  {message.text}
+                  {isSending && index === messages.length - 1 && (
+                    <span className="ml-1 inline-block h-3.5 w-[7px] translate-y-0.5 animate-pulse bg-primary" />
+                  )}
+                </div>
+              </div>
+            )
           ))}
-          {isSending && (
-            <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-              Lumen is listening...
+          {isSending && messages[messages.length - 1]?.role !== 'assistant' && (
+            <div className="flex items-center gap-2.5" aria-live="polite">
+              <img src="/icon-192.png" alt="" className="h-6 w-6 shrink-0 rounded-full" />
+              <span className="text-sm text-muted-foreground">Listening</span>
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:300ms]" />
+              </span>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       )}
 
@@ -2538,7 +2577,7 @@ function GeneralChat({
         <p className="mt-4 text-sm leading-6 text-destructive" role="alert" data-testid="status-support-error">{error}</p>
       )}
 
-      <form onSubmit={handleSupportSubmit} className="mt-5 flex items-center gap-2">
+      <form onSubmit={handleSupportSubmit} className="mt-5 flex items-center gap-2 rounded-full border border-border/90 bg-background/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-primary/50">
         <input
           type="text"
           value={input}
@@ -2546,9 +2585,9 @@ function GeneralChat({
           data-testid="input-support-message" dir="ltr"
           placeholder="Say what is on your mind..."
           maxLength={4000}
-          className="h-11 min-w-0 flex-1 rounded-lg border border-border/90 bg-background/40 px-3.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/55 focus:border-primary/50"
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/55"
         />
-        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-support" aria-label="Send to support" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        <button type="submit" disabled={isSending || !input.trim()} data-testid="button-send-support" aria-label="Send to support" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
           <Send className="h-4 w-4" strokeWidth={1.9} />
         </button>
       </form>
