@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GEMINI_MODEL = 'gemini-3.6-flash';
-const LANGUAGE_LABELS = { ar: 'Arabic', en: 'English', tr: 'Turkish', de: 'German', pt: 'Portuguese' };
+const LANGUAGE_LABELS = { ar: 'Arabic', en: 'English', tr: 'Turkish', de: 'German', pt: 'Portuguese', ru: 'Russian', es: 'Spanish', zh: 'Chinese', ko: 'Korean', ja: 'Japanese', vi: 'Vietnamese', dz: 'Algerian dialect (Darija)' };
 
 
 // Attached screenshots arrive as data URLs, which can be a few MB — allow big JSON bodies.
@@ -424,7 +424,7 @@ app.post('/api/lumen/analyze', async (req, res) => {
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
   const imageData =
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language) ? body.language : body.language === undefined ? 'en' : null;
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language) ? body.language : body.language === undefined ? 'en' : null;
   const mode = ['read', 'scam', 'conversation'].includes(body.mode) ? body.mode : 'read';
     const deep = body.deep === true;
   
@@ -542,7 +542,7 @@ ${prompt}`
 app.post('/api/lumen/chat', async (req, res) => {
   const body = req.body ?? {};
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -658,7 +658,7 @@ ${JSON.stringify(body.analysis)}`,
 });
 app.post('/api/lumen/support', async (req, res) => {
   const body = req.body ?? {};
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -755,7 +755,7 @@ app.post('/api/lumen/support', async (req, res) => {
          
 app.post('/api/lumen/general-chat', async (req, res) => {
   const body = req.body ?? {};
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -855,7 +855,7 @@ app.post('/api/lumen/image', async (req, res) => {
   const question = typeof body.question === 'string' ? body.question.trim() : '';
   const imageData =
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -956,7 +956,7 @@ app.post('/api/lumen/image', async (req, res) => {
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   const imageData =
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -1059,7 +1059,7 @@ app.post('/api/lumen/image', async (req, res) => {
 app.post('/api/lumen/advisor', async (req, res) => {
   const body = req.body ?? {};
   const situation = typeof body.situation === 'string' ? body.situation.trim() : '';
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -1151,7 +1151,7 @@ app.post('/api/lumen/study', async (req, res) => {
   const problem = typeof body.problem === 'string' ? body.problem.trim() : '';
   const imageData =
     typeof body.imageData === 'string' && body.imageData.trim() ? body.imageData.trim() : null;
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -1251,7 +1251,7 @@ app.post('/api/lumen/study', async (req, res) => {
   app.post('/api/lumen/research', async (req, res) => {
   const body = req.body ?? {};
   const question = typeof body.question === 'string' ? body.question.trim() : '';
-  const language = ['ar', 'en', 'tr', 'de', 'pt'].includes(body.language)
+  const language = ['ar', 'en', 'tr', 'de', 'pt', 'ru', 'es', 'zh', 'ko', 'ja', 'vi', 'dz'].includes(body.language)
     ? body.language
     : body.language === undefined
       ? 'en'
@@ -1360,11 +1360,10 @@ function getBotState(id) {
 
 function botLabelFor(text, state) {
   if (/[\u0600-\u06FF]/.test(text)) state.label = 'Arabic';
-    else if (/[\u3040-\u30FF]/.test(text)) state.label = 'Japanese';
+  else if (/[\u3040-\u30FF]/.test(text)) state.label = 'Japanese';
   else if (/[\u4E00-\u9FFF]/.test(text)) state.label = 'Chinese';
   else if (/[\uAC00-\uD7AF]/.test(text)) state.label = 'Korean';
   else if (/[\u0400-\u04FF]/.test(text)) state.label = 'Russian';
-  
   return state.label;
 }
 
