@@ -75,7 +75,7 @@ interface SavedRead {
   language: LumenLanguage;
   mode: LumenMode;
   at: string;
-  }
+}
 
 interface LumenProject {
   id: number;
@@ -83,7 +83,6 @@ interface LumenProject {
   note: string;
   at: string;
 }
-
 
 
 export default function App() {
@@ -316,6 +315,13 @@ function Home() {
       tr: 'tr-TR',
       de: 'de-DE',
       pt: 'pt-PT',
+      ru: 'ru-RU',
+      es: 'es-ES',
+      zh: 'zh-CN',
+      ko: 'ko-KR',
+      ja: 'ja-JP',
+      vi: 'vi-VN',
+      dz: 'ar-DZ',
     };
     recognition.lang = langByLanguage[language];
     recognition.interimResults = false;
@@ -415,6 +421,13 @@ function Home() {
       tr: 'tr',
       de: 'de',
       pt: 'pt',
+      ru: 'ru',
+      es: 'es',
+      zh: 'zh',
+      ko: 'ko',
+      ja: 'ja',
+      vi: 'vi',
+      dz: 'ar',
     };
     const prefix = langByLanguage[analysisLanguage];
     utterance.lang = prefix;
@@ -774,6 +787,13 @@ function Home() {
 <option value="tr">Türkçe</option>
 <option value="de">Deutsch</option>
 <option value="pt">Português</option>
+                  <option value="ru">Русский</option>
+                  <option value="es">Español</option>
+                  <option value="zh">中文</option>
+                  <option value="ko">한국어</option>
+                  <option value="ja">日本語</option>
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="dz">الدارجة الجزائرية</option>
 
 
                 </select>
@@ -788,7 +808,7 @@ function Home() {
                     {panelOpen && (
             <div className="fixed inset-0 z-50" data-testid="container-lumen-panel">
               <button type="button" aria-label="Close the panel" onClick={() => setPanelOpen(false)} className="absolute inset-0 h-full w-full cursor-default bg-black/60" />
-              <div className={`absolute top-0 flex h-full w-[86%] max-w-[340px] flex-col bg-[#0a0b0a] p-5 ${language === 'ar' ? 'right-0 border-l border-border/70' : 'left-0 border-r border-border/70'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+              <div className={`absolute top-0 flex h-full w-[86%] max-w-[340px] flex-col bg-[#0a0b0a] p-5 ${(language === 'ar' || language === 'dz') ? 'right-0 border-l border-border/70' : 'left-0 border-r border-border/70'}`} dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'}>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2.5">
                     <span className="brand-mark grid h-9 w-9 place-items-center rounded-xl">
@@ -905,6 +925,13 @@ function Home() {
                             { value: 'tr', label: 'Türkçe' },
                             { value: 'de', label: 'Deutsch' },
                             { value: 'pt', label: 'Português' },
+                            { value: 'ru', label: 'Русский' },
+                            { value: 'es', label: 'Español' },
+                            { value: 'zh', label: '中文' },
+                            { value: 'ko', label: '한국어' },
+                            { value: 'ja', label: '日本語' },
+                            { value: 'vi', label: 'Tiếng Việt' },
+                            { value: 'dz', label: 'الدارجة الجزائرية' },
                           ] as { value: LumenLanguage; label: string }[]).map((option) => (
                             <button key={option.value} type="button" onClick={() => setLanguage(option.value)} data-testid={`button-settings-language-${option.value}`} aria-pressed={language === option.value} className={language === option.value ? 'block w-full rounded-lg bg-primary/15 px-3 py-2 text-left text-sm font-medium text-foreground' : 'block w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'}>
                               {option.label}
@@ -1548,7 +1575,7 @@ function AnalysisResult({
     }
   };
   return (
-    <div className="space-y-3" dir={language === 'ar' ? 'rtl' : 'ltr'} data-language={language} data-testid="container-analysis-result">
+    <div className="space-y-3" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-language={language} data-testid="container-analysis-result">
       <article className="result-summary relative overflow-hidden rounded-[20px] border border-primary/25 p-5 sm:p-7">
         <div className="absolute right-5 top-5 h-14 w-14 rounded-full border border-primary/25" aria-hidden="true" />
         <div className="absolute right-8 top-8 h-8 w-8 rounded-full border border-accent/30" aria-hidden="true" />
@@ -1707,7 +1734,7 @@ function FollowUpChat({
   };
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-follow-up-chat">
       <div className="flex items-center gap-2 text-accent">
         <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Follow-up</h2>
@@ -1767,6 +1794,13 @@ const SUPPORT_INTRO: Record<LumenLanguage, string> = {
   tr: 'Zihnindekileri konuşmak için sakin bir alan. Ben bu uygulamanın içindeki bir destek arkadaşıyım: seni dinlerim, düşüncelerini düzenlemene, gerçekleri korkulardan ayırmana ve dengeni yeniden bulmana yardım ederim. Doktor ya da terapist değilim; tanı koymam, tedavi önermem. Taşıdığın şey ağır ya da kalıcı geliyorsa, doğru kapı gerçek bir uzmandır.',
   de: 'Ein ruhiger Raum, um auszusprechen, was dich beschäftigt. Ich bin ein Begleiter zur Unterstützung in dieser App: Ich höre zu, helfe dir, deine Gedanken zu ordnen, Fakten von Ängsten zu trennen und dein Gleichgewicht wiederzufinden. Ich bin kein Arzt und kein Therapeut — ich stelle keine Diagnosen und behandle nicht. Wenn das, was du trägst, schwer oder anhaltend ist, ist ein echter Fachmann die richtige Tür.',
   pt: 'Um espaço calmo para falar do que vai na sua mente. Sou um companheiro de apoio dentro desta aplicação: ouço-o, ajudo-o a organizar os pensamentos, a separar factos de medos e a reencontrar o equilíbrio. Não sou médico nem terapeuta — não faço diagnósticos nem tratamentos. Se o que carrega parecer pesado ou duradouro, um profissional a sério é a porta certa.',
+  ru: 'Спокойное пространство, чтобы поговорить о том, что у вас на душе. Я — помощник поддержки внутри этого приложения: я слушаю, помогаю упорядочить мысли, отделить факты от страхов и снова найти равновесие. Я не врач и не терапевт — я не ставлю диагнозы и не лечу. Если то, что вы несёте, кажется тяжёлым или длительным, правильная дверь — настоящий специалист.',
+  es: 'Un espacio tranquilo para hablar de lo que tienes en mente. Soy un compañero de apoyo dentro de esta aplicación: te escucho, te ayudo a organizar tus pensamientos, a separar los hechos de los miedos y a recuperar tu equilibrio. No soy médico ni terapeuta: no diagnostico ni trato. Si lo que llevas te parece pesado o duradero, la puerta correcta es un profesional de verdad.',
+  zh: '一个可以平静谈谈心事的空间。我是这个应用里的支持伙伴：我倾听你，帮助你整理思绪，把事实和恐惧分开，重新找回平衡。我不是医生，也不是治疗师——我不做诊断，也不提供治疗。如果你背负的东西让你觉得沉重或持续很久，真正的专业人士才是正确的门。',
+  ko: '마음에 있는 이야기를 차분히 나눌 수 있는 공간입니다. 저는 이 앱 안의 지원 동반자입니다: 당신의 이야기를 듣고, 생각을 정리하고, 사실과 두려움을 구분하고, 다시 균형을 찾도록 돕습니다. 저는 의사도 치료사도 아닙니다 — 진단하거나 치료하지 않습니다. 짊어진 것이 무겁거나 오래 지속된다고 느껴진다면, 진짜 전문가가 올바른 문입니다.',
+  ja: '心にあることを落ち着いて話せる場所です。私はこのアプリ内のサポートパートナーです：あなたの話を聞き、考えを整理し、事実と不安を分け、バランスを取り戻すお手伝いをします。私は医師でもセラピストでもありません——診断も治療もしません。抱えているものが重く、長く続くと感じるなら、本当の専門家が正しい扉です。',
+  vi: 'Một không gian yên tĩnh để nói về những điều trong lòng bạn. Tôi là người bạn đồng hành hỗ trợ trong ứng dụng này: tôi lắng nghe, giúp bạn sắp xếp suy nghĩ, tách sự thật khỏi nỗi sợ và tìm lại sự cân bằng. Tôi không phải bác sĩ hay nhà trị liệu — tôi không chẩn đoán hay điều trị. Nếu điều bạn đang mang cảm thấy nặng nề hoặc kéo dài, một chuyên gia thật sự là cánh cửa đúng.',
+  dz: 'بلاصة هادئة باش تحكي على اللي في قلبك. أنا مساعد دعم داخل هاذ التطبيق: نسمعك، ونعاونك ترتب أفكارك وتفرق بين الحقائق والمخاوف، وترجع لتوازنك. أنا ماشي طبيب وماشي معالج، ما نشخص ما نعالج — وإذا كان اللي راك هازو ثقيل ولا طول، المختص الحقيقي هو الباب الصحيح.',
 };
 
 function StudyDoor({
@@ -1797,7 +1831,7 @@ function StudyDoor({
   const studyFileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-study-door">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-study-door">
       <div className="flex items-center gap-2 text-accent">
         <GraduationCap className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your study</h2>
@@ -1911,7 +1945,7 @@ function ResearchDoor({
   language: LumenLanguage;
 }) {
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-research-door">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-research-door">
       <div className="flex items-center gap-2 text-accent">
         <Search className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your research</h2>
@@ -1989,7 +2023,7 @@ function AdvisorDoor({
   language: LumenLanguage;
 }) {
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-advisor-door">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-advisor-door">
       <div className="flex items-center gap-2 text-accent">
         <Compass className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your genius advisor</h2>
@@ -2095,7 +2129,7 @@ function ShieldDoor({
   const shieldFileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-shield-door">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-shield-door">
       <div className="flex items-center gap-2 text-accent">
         <ShieldAlert className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your shield</h2>
@@ -2224,7 +2258,7 @@ function ShieldDoor({
   const doorFileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-image-door">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-image-door">
       <div className="flex items-center gap-2 text-accent">
         <ScanEye className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your image</h2>
@@ -2328,7 +2362,7 @@ function GeneralChat({
   };
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-general-chat">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-general-chat">
       <div className="flex items-center gap-2 text-accent">
         <MessageSquareText className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">Your chat</h2>
@@ -2406,7 +2440,7 @@ function GeneralChat({
   };
 
   return (
-    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'} data-testid="container-support-chat">
+    <article className="luminous-panel rounded-[18px] p-5 sm:p-6" dir={(language === 'ar' || language === 'dz') ? 'rtl' : 'ltr'} data-testid="container-support-chat">
       <div className="flex items-center gap-2 text-accent">
         <Heart className="h-4 w-4" strokeWidth={1.7} />
         <h2 className="font-mono-label text-[9px] uppercase tracking-[.18em]">A calmer space</h2>
