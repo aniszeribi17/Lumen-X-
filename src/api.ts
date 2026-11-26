@@ -1,7 +1,8 @@
 // The contract between the browser and our server.
 // These shapes mirror the original Lumen X API exactly — do not rename fields.
 
-export type LumenLanguage = 'ar' | 'en' | 'tr' | 'de' | 'pt';
+export type LumenLanguage = 'ar' | 'en' | 'tr' | 'de' | 'pt' | 'ru' | 'es' | 'zh' | 'ko' | 'ja' | 'vi' | 'dz';
+
 export type LumenMode = 'read' | 'scam' | 'conversation';
 
 
