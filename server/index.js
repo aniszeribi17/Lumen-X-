@@ -1346,6 +1346,328 @@ app.post('/api/lumen/study', async (req, res) => {
 });
       
       // Unknown API routes get a JSON 404, not the web page.
+// ===== Lumen Bot: the same assistant on Telegram and Messenger =====
+// One brain, two thin adapters. Chat state lives in memory only.
+
+const botStates = new Map();
+
+function getBotState(id) {
+  if (!botStates.has(id)) {
+    botStates.set(id, { mode: 'chat', history: [], label: 'English' });
+  }
+  return botStates.get(id);
+}
+
+function botLabelFor(text, state) {
+  if (/[\u0600-\u06FF]/.test(text)) state.label = 'Arabic';
+  return state.label;
+}
+
+async function botGemini(systemPrompt, contents, asJson) {
+  const apiKey = getGeminiApiKey();
+  const endpoint = new URL(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+  );
+  endpoint.searchParams.set('key', apiKey);
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: asJson
+        ? { responseMimeType: 'application/json', maxOutputTokens: 8192 }
+        : { maxOutputTokens: 4096 },
+    }),
+  });
+  if (!response.ok) throw new Error(`Gemini bot request failed: ${response.status}`);
+  const body = await response.json();
+  return (
+    body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim() ?? ''
+  );
+}
+
+function botParseJson(text) {
+  try {
+    return JSON.parse(stripJsonFences(text));
+  } catch {
+    return null;
+  }
+}
+
+function botList(items) {
+  return (Array.isArray(items) ? items : []).map((item) => `• ${item}`).join('\n');
+}
+
+async function botBrain(state, text) {
+  const label = botLabelFor(text, state);
+  const userTurn = { role: 'user', parts: [{ text }] };
+
+  if (state.mode === 'chat' || state.mode === 'support') {
+    const system =
+      state.mode === 'chat' ? buildGeneralSystemPrompt(label) : buildSupportSystemPrompt(label);
+    state.history.push(userTurn);
+    state.history = state.history.slice(-20);
+    const reply = await botGemini(system, state.history, false);
+    state.history.push({ role: 'model', parts: [{ text: reply }] });
+    state.history = state.history.slice(-20);
+    return reply || '…';
+  }
+
+  if (state.mode === 'analyze') {
+    const raw = await botGemini(buildSystemPrompt(label), [userTurn], true);
+    const data = botParseJson(raw);
+    if (!data) return raw;
+    return [
+      data.summary,
+      data.whatItMeans?.length ? `\n${botList(data.whatItMeans)}` : '',
+      data.nextStep ? `\n➡️ ${data.nextStep}` : '',
+      data.reply ? `\n💬 ${data.reply}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (state.mode === 'shield') {
+    const raw = await botGemini(buildShieldSystemPrompt(label), [userTurn], true);
+    const data = botParseJson(raw);
+    if (!data) return raw;
+    return [
+      `🛡️ ${data.verdict ?? ''}`,
+      data.riskLevel ? `⚠️ Risk: ${data.riskLevel}` : '',
+      data.signals?.length ? `\n${botList(data.signals)}` : '',
+      data.whatToDo?.length ? `\n✅\n${botList(data.whatToDo)}` : '',
+      data.howToHandle ? `\n${data.howToHandle}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (state.mode === 'advisor') {
+    const raw = await botGemini(buildAdvisorSystemPrompt(label), [userTurn], true);
+    const data = botParseJson(raw);
+    if (!data) return raw;
+    return [
+      `🧭 ${data.verdict ?? ''}`,
+      data.why?.length ? `\n${botList(data.why)}` : '',
+      data.theAction ? `\n➡️ ${data.theAction}` : '',
+      data.exactWords ? `\n💬 "${data.exactWords}"` : '',
+      data.avoid?.length ? `\n🚫\n${botList(data.avoid)}` : '',
+      data.costOfWaiting ? `\n⏳ ${data.costOfWaiting}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (state.mode === 'study') {
+    const raw = await botGemini(buildStudySystemPrompt(label), [userTurn], true);
+    const data = botParseJson(raw);
+    if (!data) return raw;
+    const steps = (Array.isArray(data.steps) ? data.steps : [])
+      .map((step, index) => `${index + 1}. ${step.title}\n${step.work}\n${step.why}`)
+      .join('\n\n');
+    return [
+      `📚 ${data.subject ?? ''}`,
+      data.givens?.length ? `\n${botList(data.givens)}` : '',
+      steps ? `\n${steps}` : '',
+      data.finalAnswer ? `\n✅ ${data.finalAnswer}` : '',
+      data.check ? `\n🔍 ${data.check}` : '',
+      data.watchOut ? `\n⚠️ ${data.watchOut}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (state.mode === 'research') {
+    return (await botGemini(buildResearchSystemPrompt(label), [userTurn], false)) || '…';
+  }
+
+  return '…';
+}
+
+const BOT_SERVICES = [
+  { mode: 'chat', title: '💬 Your Chat', prompt: '💬 Your Chat — ask me anything.\nمحادثتك — اسألني أي شيء.' },
+  { mode: 'analyze', title: '🔍 Analyze', prompt: '🔍 Send the text, message, or offer you want me to read.\nابعت النص أو الرسالة أو العرض اللي تحب نقراهولك.' },
+  { mode: 'shield', title: '🛡️ Your Shield', prompt: '🛡️ Send the message, offer, or account you want checked for scam or manipulation.\nابعت الرسالة أو العرض أو الحساب اللي تحب نفحصهولك من النصب والتلاعب.' },
+  { mode: 'support', title: '❤️ Your Support', prompt: '❤️ Your Support — tell me what is on your mind. I listen and help you order your thoughts.\nمساعدك النفسي — قولي واش في قلبك. نسمعك ونعاونك ترتب أفكارك.' },
+  { mode: 'advisor', title: '🧭 Your Advisor', prompt: '🧭 Describe your situation or the decision in front of you.\nاوصف وضعيتك ولا القرار اللي قدامك.' },
+  { mode: 'study', title: '📚 Your Study', prompt: '📚 Send your mathematics or physics problem.\nابعت تمرينك في الرياضيات ولا الفيزياء.' },
+  { mode: 'research', title: '🌐 Your Research', prompt: '🌐 Ask your question and I research it with sources.\nاسأل سؤالك ونبحثهولك بالمصادر.' },
+];
+
+function botService(mode) {
+  return BOT_SERVICES.find((service) => service.mode === mode) ?? BOT_SERVICES[0];
+}
+
+const BOT_WELCOME =
+  '✨ Lumen X — your life, clearer.\nChoose a service below, or just write to me.\n\nاختر خدمة من التحت، ولا اكتب لي مباشرة.';
+
+// ----- Telegram -----
+
+async function tgApi(token, method, payload) {
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return response.json().catch(() => ({}));
+}
+
+function tgKeyboard() {
+  const rows = [];
+  for (let i = 0; i < BOT_SERVICES.length; i += 2) {
+    rows.push(
+      BOT_SERVICES.slice(i, i + 2).map((service) => ({
+        text: service.title,
+        callback_data: `mode:${service.mode}`,
+      })),
+    );
+  }
+  return { inline_keyboard: rows };
+}
+
+async function tgSend(token, chatId, text, withKeyboard) {
+  const chunks = [];
+  let rest = text;
+  while (rest.length > 3900) {
+    chunks.push(rest.slice(0, 3900));
+    rest = rest.slice(3900);
+  }
+  chunks.push(rest);
+  for (let i = 0; i < chunks.length; i += 1) {
+    await tgApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text: chunks[i],
+      ...(withKeyboard && i === chunks.length - 1 ? { reply_markup: tgKeyboard() } : {}),
+    });
+  }
+}
+
+app.get('/api/telegram/setup', async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || req.query.key !== token) {
+    return res.status(404).json({ error: 'Not found.' });
+  }
+  const url = `https://${req.get('host')}/api/telegram/webhook`;
+  const result = await tgApi(token, 'setWebhook', { url });
+  return res.json({ webhook: url, telegram: result });
+});
+
+app.post('/api/telegram/webhook', async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return res.status(404).json({ error: 'Not found.' });
+  res.json({ ok: true });
+  try {
+    const update = req.body ?? {};
+    if (update.callback_query) {
+      const query = update.callback_query;
+      const chatId = query.message?.chat?.id;
+      const mode = String(query.data ?? '').replace('mode:', '');
+      if (chatId && BOT_SERVICES.some((service) => service.mode === mode)) {
+        const state = getBotState(`tg:${chatId}`);
+        state.mode = mode;
+        if (mode === 'chat' || mode === 'support') state.history = [];
+        await tgApi(token, 'answerCallbackQuery', { callback_query_id: query.id });
+        await tgSend(token, chatId, botService(mode).prompt, false);
+      }
+      return;
+    }
+    const message = update.message;
+    const chatId = message?.chat?.id;
+    const text = typeof message?.text === 'string' ? message.text.trim() : '';
+    if (!chatId || !text) return;
+    const state = getBotState(`tg:${chatId}`);
+    if (text === '/start' || text === '/menu') {
+      state.mode = 'chat';
+      state.history = [];
+      await tgSend(token, chatId, BOT_WELCOME, true);
+      return;
+    }
+    const reply = await botBrain(state, text);
+    await tgSend(token, chatId, reply, false);
+  } catch (error) {
+    console.error('Telegram bot failed:', error);
+  }
+});
+
+// ----- Messenger -----
+
+async function fbSend(token, recipientId, text, withMenu) {
+  const chunks = [];
+  let rest = text;
+  while (rest.length > 1900) {
+    chunks.push(rest.slice(0, 1900));
+    rest = rest.slice(1900);
+  }
+  chunks.push(rest);
+  for (let i = 0; i < chunks.length; i += 1) {
+    const message = { text: chunks[i] };
+    if (withMenu && i === chunks.length - 1) {
+      message.quick_replies = BOT_SERVICES.map((service) => ({
+        content_type: 'text',
+        title: service.title.slice(0, 20),
+        payload: `mode:${service.mode}`,
+      }));
+    }
+    await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient: { id: recipientId }, messaging_type: 'RESPONSE', message }),
+    });
+  }
+}
+
+app.get('/api/messenger/webhook', (req, res) => {
+  const verifyToken = process.env.MESSENGER_VERIFY_TOKEN;
+  if (
+    verifyToken &&
+    req.query['hub.mode'] === 'subscribe' &&
+    req.query['hub.verify_token'] === verifyToken
+  ) {
+    return res.status(200).send(req.query['hub.challenge']);
+  }
+  return res.status(403).send('Verification failed.');
+});
+
+app.post('/api/messenger/webhook', async (req, res) => {
+  const token = process.env.MESSENGER_PAGE_TOKEN;
+  if (!token) return res.status(404).json({ error: 'Not found.' });
+  res.json({ ok: true });
+  try {
+    const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+    for (const entry of entries) {
+      const events = Array.isArray(entry.messaging) ? entry.messaging : [];
+      for (const event of events) {
+        const senderId = event.sender?.id;
+        if (!senderId) continue;
+        const state = getBotState(`fb:${senderId}`);
+        const payload = event.message?.quick_reply?.payload ?? event.postback?.payload ?? '';
+        if (typeof payload === 'string' && payload.startsWith('mode:')) {
+          const mode = payload.replace('mode:', '');
+          if (BOT_SERVICES.some((service) => service.mode === mode)) {
+            state.mode = mode;
+            if (mode === 'chat' || mode === 'support') state.history = [];
+            await fbSend(token, senderId, botService(mode).prompt, false);
+          }
+          continue;
+        }
+        const text = typeof event.message?.text === 'string' ? event.message.text.trim() : '';
+        if (!text) continue;
+        if (text === '/menu' || text.toLowerCase() === 'menu' || text === 'ابدأ') {
+          state.mode = 'chat';
+          state.history = [];
+          await fbSend(token, senderId, BOT_WELCOME, true);
+          continue;
+        }
+        const reply = await botBrain(state, text);
+        await fbSend(token, senderId, reply, false);
+      }
+    }
+  } catch (error) {
+    console.error('Messenger bot failed:', error);
+  }
+});
+      
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
 });
