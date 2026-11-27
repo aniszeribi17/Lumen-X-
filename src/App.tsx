@@ -1464,7 +1464,7 @@ function Home() {
                     </div>
                     {isDeepening && !deepResult && (
                       <p className="mt-4 flex items-center gap-2.5 text-sm text-muted-foreground" aria-live="polite">
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                        <span className="thinking-dots" aria-hidden="true"><span /><span /><span /></span>
                         Preparing...
                       </p>
                     )}
@@ -1821,7 +1821,7 @@ function FollowUpChat({
           ))}
           {isSending && (
             <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              <span className="thinking-dots" aria-hidden="true"><span /><span /><span /></span>
               Lumen is thinking...
             </div>
           )}
@@ -2449,7 +2449,7 @@ function GeneralChat({
           ))}
           {isSending && (
             <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              <span className="thinking-dots" aria-hidden="true"><span /><span /><span /></span>
               Lumen is thinking...
             </div>
           )}
@@ -2527,7 +2527,7 @@ function GeneralChat({
           ))}
           {isSending && (
             <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-background/35 px-3.5 py-3 text-sm text-muted-foreground" aria-live="polite">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              <span className="thinking-dots" aria-hidden="true"><span /><span /><span /></span>
               Lumen is listening...
             </div>
           )}
