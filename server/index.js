@@ -1721,6 +1721,12 @@ function tgKeyboard() {
   return { inline_keyboard: rows };
 }
 
+function tgDotsMarkup() {
+  // One quiet button under every answer: the way back to the services
+  // without scrolling up to the welcome message.
+  return { inline_keyboard: [[{ text: '\u22ef Services \u2022 \u0627\u0644\u062e\u062f\u0645\u0627\u062a', callback_data: 'menu:open' }]] };
+}
+
 async function tgSend(token, chatId, text, withKeyboard) {
   const chunks = [];
   let rest = text;
@@ -1730,12 +1736,26 @@ async function tgSend(token, chatId, text, withKeyboard) {
   }
   chunks.push(rest);
   for (let i = 0; i < chunks.length; i += 1) {
+    const isLast = i === chunks.length - 1;
     await tgApi(token, 'sendMessage', {
       chat_id: chatId,
       text: chunks[i],
-      ...(withKeyboard && i === chunks.length - 1 ? { reply_markup: tgKeyboard() } : {}),
+      ...(isLast && withKeyboard === 'full' ? { reply_markup: tgKeyboard() } : {}),
+      ...(isLast && withKeyboard === 'dots' ? { reply_markup: tgDotsMarkup() } : {}),
     });
   }
+}
+
+let tgCommandsRegistered = false;
+function tgRegisterCommands(token) {
+  if (tgCommandsRegistered) return;
+  tgCommandsRegistered = true;
+  tgApi(token, 'setMyCommands', {
+    commands: [
+      { command: 'start', description: 'Start over' },
+      { command: 'menu', description: 'Services' },
+    ],
+  }).catch(() => {});
 }
 
 app.get('/api/telegram/setup', async (req, res) => {
@@ -1751,12 +1771,18 @@ app.get('/api/telegram/setup', async (req, res) => {
 app.post('/api/telegram/webhook', async (req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return res.status(404).json({ error: 'Not found.' });
+  tgRegisterCommands(token);
   res.json({ ok: true });
   try {
     const update = req.body ?? {};
     if (update.callback_query) {
       const query = update.callback_query;
       const chatId = query.message?.chat?.id;
+      if (chatId && query.data === 'menu:open') {
+        await tgApi(token, 'answerCallbackQuery', { callback_query_id: query.id });
+        await tgSend(token, chatId, BOT_WELCOME, 'full');
+        return;
+      }
       const mode = String(query.data ?? '').replace('mode:', '');
       if (chatId && BOT_SERVICES.some((service) => service.mode === mode)) {
         const state = getBotState(`tg:${chatId}`);
@@ -1775,11 +1801,11 @@ app.post('/api/telegram/webhook', async (req, res) => {
     if (text === '/start' || text === '/menu') {
       state.mode = 'chat';
       state.history = [];
-      await tgSend(token, chatId, BOT_WELCOME, true);
+      await tgSend(token, chatId, BOT_WELCOME, 'full');
       return;
     }
     const reply = await botBrain(state, text);
-    await tgSend(token, chatId, reply, false);
+    await tgSend(token, chatId, reply, 'dots');
   } catch (error) {
     console.error('Telegram bot failed:', error);
   }
