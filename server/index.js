@@ -421,39 +421,93 @@ app.get('/api/healthz', (req, res) => {
 
 
 async function streamChatReply(res, apiKey, systemText, contents) {
-  const endpoint = new URL(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent`,
-  );
-  endpoint.searchParams.set('key', apiKey);
-  endpoint.searchParams.set('alt', 'sse');
-
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemText }] },
-        contents,
-        generationConfig: { maxOutputTokens: 2048 },
-      }),
-    });
-  } catch (error) {
-    console.error('Gemini stream request failed:', error);
-    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
-  }
-
-  if (!response.ok || !response.body) {
-    const upstreamBody = await response.text().catch(() => '');
-    console.error('Gemini stream request failed:', response.status, upstreamBody.slice(0, 1000));
-    return res.status(502).json({ error: "Lumen couldn't answer that. Please try again." });
-  }
-
+  // Open the stream to the browser FIRST, before contacting Gemini, so the
+  // connection is visibly alive from the first second and no proxy or
+  // gateway ever sees an idle socket while Gemini warms up.
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
   });
+  res.write(': connected\n\n');
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': hb\n\n');
+    } catch {
+      // socket already gone
+    }
+  }, 10000);
+
+  let clientGone = false;
+  res.on('close', () => {
+    clientGone = true;
+  });
+
+  const sendErrorAndDone = (message) => {
+    try {
+      res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    } catch {
+      // socket already gone
+    }
+  };
+
+  // Connect to Gemini with a per-attempt timeout and retries, so one hung
+  // or refused upstream request can no longer freeze an answer forever.
+  // Chat asks for a low thinking level to keep first words fast; if the
+  // model ever rejects that setting, the last attempt drops it and the
+  // request behaves exactly like the plain one.
+  let response = null;
+  const attempts = [
+    { delay: 0, thinking: true },
+    { delay: 1200, thinking: true },
+    { delay: 2500, thinking: false },
+  ];
+  for (const attempt of attempts) {
+    if (clientGone) break;
+    if (attempt.delay) await new Promise((resolve) => setTimeout(resolve, attempt.delay));
+    const endpoint = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent`,
+    );
+    endpoint.searchParams.set('key', apiKey);
+    endpoint.searchParams.set('alt', 'sse');
+    const generationConfig = { maxOutputTokens: 2048 };
+    if (attempt.thinking) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
+    const controller = new AbortController();
+    const connectTimer = setTimeout(() => controller.abort(), 25_000);
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemText }] },
+          contents,
+          generationConfig,
+        }),
+      });
+    } catch (error) {
+      console.error('Gemini stream connect failed:', error);
+      response = null;
+    } finally {
+      clearTimeout(connectTimer);
+    }
+    if (response && response.ok && response.body) break;
+    if (response) {
+      const upstreamBody = await response.text().catch(() => '');
+      console.error('Gemini stream request failed:', response.status, upstreamBody.slice(0, 1000));
+      response = null;
+    }
+  }
+
+  if (!response || !response.body) {
+    clearInterval(heartbeat);
+    if (!clientGone) {
+      sendErrorAndDone("Lumen couldn't answer that. Please try again.");
+      res.end();
+    }
+    return;
+  }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -462,6 +516,10 @@ async function streamChatReply(res, apiKey, systemText, contents) {
   let sentAny = false;
   try {
     for (;;) {
+      if (clientGone) {
+        reader.cancel().catch(() => {});
+        break;
+      }
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -489,12 +547,19 @@ async function streamChatReply(res, apiKey, systemText, contents) {
     console.error('Gemini stream read failed:', error);
   } finally {
     clearTimeout(killer);
+    clearInterval(heartbeat);
   }
 
+  if (clientGone) return;
   if (!sentAny) {
-    res.write(`data: ${JSON.stringify({ error: "Lumen couldn't answer that. Please try again." })}\n\n`);
+    sendErrorAndDone("Lumen couldn't answer that. Please try again.");
+  } else {
+    try {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    } catch {
+      // socket already gone
+    }
   }
-  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 }
 
